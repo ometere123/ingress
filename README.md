@@ -39,7 +39,7 @@ Only a `SAFE` capsule with at least one validator-grounded excerpt returns `is_c
 | Deployment source | `594d32439eb67af666bc69935ff161ababc58741` |
 | Deployment method | official genlayer-test Studio Mode |
 
-The deployable `contracts/ingress.py` on current `main` is unchanged from the deployed source commit. Later commits add the hostile public fixture and documentation/evidence only. Full transaction evidence is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+The deployable `contracts/ingress.py` on current `main` is unchanged from the deployed source commit. Subsequent commits affect only tests, tooling dependencies, fixtures and documentation; the deployable contract source remains identical. Full transaction evidence is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 Live smoke verification against this address includes safe open `0x6904fced0e3e692192a65413dd417bed99acce7ac65c6b1dd2c3160447cac224`, safe resolve `0x47703a64c766f1955452b8863cd0988982e04008c310df939737e8459ee095ea` (`SAFE`, risk `0`, consumable `true`), cancellation `0x56e7e14c9826dd5c4c386a528cbd7d8afdfc6bf40e25bceb1a5990d8a24f6052` (`CANCELLED`), and hostile resolve `0x1b0c6f3d6f4cf6d5385f5407d622a5c16d2b9dda5fffeef9fbb762ea4d9d450a` (`QUARANTINED`, risk `265`, consumable `false`).
 
@@ -111,7 +111,7 @@ The load-bearing GenLayer property is that validators independently observe and 
 | Meaningful beyond a demo | Reusable intake gate for prediction, insurance, governance, policy, agent and corroboration contracts |
 | Readable source | Bounded helpers, fixed risk taxonomy and deterministic terminal derivation |
 | Documentation | Consensus, security, integration and real deployment evidence docs |
-| Tests | 74/74 source preflight checks, 19/19 Direct Mode tests, pickling enabled, live Studionet smoke evidence |
+| Tests | 74/74 source preflight checks, 19/19 Direct Mode tests, pickling enabled, 4/4 Studionet integration tests and live smoke evidence |
 | Not a Project submission | No frontend, dashboard, wallet UX, backend or settlement-specific workflow |
 
 ## Contract boundary
@@ -126,6 +126,7 @@ Supporting material:
 
 ```text
 tests/direct/                    Direct Mode security and state tests
+tests/integration/               reproducible live Studionet consensus tests
 scripts/preflight.py             zero-dependency source/security preflight
 scripts/deploy_studionet.py      unlocked-account Studionet deployment helper
 fixtures/hostile_evidence.txt    public hostile source used in live verification
@@ -446,7 +447,7 @@ The committed linter dependency is the published `genvm-linter==0.11.0` package.
 
 ### Studionet integration
 
-The committed integration suite deploys the current contract through official Studio Mode and exercises real validator consensus, safe evidence, hostile evidence, and cancellation:
+The committed integration suite deploys the current contract through official Studio Mode and exercises real validator consensus, safe evidence, hostile evidence, and cancellation. Each behavioural test uses a fresh disposable deployment, so cases can be run independently without relying on pytest execution order:
 
 ```bash
 pytest tests/integration/ -v -s --network studionet
@@ -546,9 +547,11 @@ See [`docs/INTEGRATION.md`](docs/INTEGRATION.md).
 ├── contracts/
 │   └── ingress.py
 ├── tests/
-│   └── direct/
-│       ├── test_ingress.py
-│       └── test_ingress_hardening.py
+│   ├── direct/
+│   │   ├── test_ingress.py
+│   │   └── test_ingress_hardening.py
+│   └── integration/
+│       └── test_ingress_studionet.py
 ├── scripts/
 │   ├── preflight.py
 │   └── deploy_studionet.py
@@ -574,6 +577,7 @@ See [`docs/INTEGRATION.md`](docs/INTEGRATION.md).
 | [`contracts/ingress.py`](contracts/ingress.py) | canonical deployable Intelligent Contract |
 | [`tests/direct/test_ingress.py`](tests/direct/test_ingress.py) | state, consensus and normal security behavior |
 | [`tests/direct/test_ingress_hardening.py`](tests/direct/test_ingress_hardening.py) | forged-leader and malformed-output adversarial coverage |
+| [`tests/integration/test_ingress_studionet.py`](tests/integration/test_ingress_studionet.py) | independently runnable live Studionet safe, hostile and cancellation coverage |
 | [`scripts/preflight.py`](scripts/preflight.py) | zero-dependency source/security gate |
 | [`docs/CONSENSUS.md`](docs/CONSENSUS.md) | custom validator and equivalence design |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | threat model, guarantees and limitations |
@@ -588,9 +592,10 @@ If you have five minutes:
 1. Read the contract thesis and live deployment table at the top of this README.
 2. Inspect [`contracts/ingress.py`](contracts/ingress.py), especially `_inspect`, the custom validator, terminal status derivation and `is_consumable`.
 3. Inspect the forged-leader tests in [`tests/direct/test_ingress_hardening.py`](tests/direct/test_ingress_hardening.py).
-4. Read [`docs/CONSENSUS.md`](docs/CONSENSUS.md) for what must agree and what may vary.
-5. Read [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for real safe and hostile Studionet transactions.
-6. Read [`docs/SECURITY.md`](docs/SECURITY.md) for explicit non-guarantees.
+4. Run or inspect [`tests/integration/test_ingress_studionet.py`](tests/integration/test_ingress_studionet.py) for reproducible live consensus evidence.
+5. Read [`docs/CONSENSUS.md`](docs/CONSENSUS.md) for what must agree and what may vary.
+6. Read [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for real safe and hostile Studionet transactions.
+7. Read [`docs/SECURITY.md`](docs/SECURITY.md) for explicit non-guarantees.
 
 ## Builder submission
 

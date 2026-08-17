@@ -1,7 +1,7 @@
 # Ingress Studionet Deployment
 
 Source commit:
-`594d324` (full commit: `594d324`)
+`594d32439eb67af666bc69935ff161ababc58741`
 
 Date:
 2026-08-17
@@ -33,7 +33,7 @@ The deployed source is commit `594d324`.
 
 `contracts/ingress.py` has not changed after that deployment source commit. Subsequent repository commits add reviewer/deployment documentation only.
 
-The detailed safe/hostile smoke transactions below were executed against an earlier deployment of the same byte-identical contract source; the fresh Studio Mode deployment above reached `ACCEPTED` / `MAJORITY_AGREE`.
+All runtime transactions below target the lint-clean deployment above. The earlier pre-linter safe/hostile transactions are historical and intentionally omitted from this current-runtime table.
 
 ## Runtime verification
 
@@ -42,14 +42,13 @@ The detailed safe/hostile smoke transactions below were executed against an earl
 | Schema | — | PASS; all expected Ingress methods present, including `open_inspection`, `resolve`, `cancel`, `get_capsule`, `is_consumable`, and `get_risk_dictionary` |
 | Deployed code | — | PASS; CLI returned the deployed Python source matching the deployment source commit |
 | `get_risk_dictionary()` | — | PASS; all 10 expected diagnostic bits returned |
-| Open safe inspection | `0x32fdf3fcfd9c53d49730a3757d9f3b26311e75aa7feeeb7f06c6eec5f10185d2` | PASS; capsule `1`, `PENDING` |
-| Read pending capsule | — | PASS; status `0`, empty excerpts, `consumable: false` |
-| Open cancellation inspection | `0x7ed99a4ca79c225ebd067e08e4b4e309c1314c6c0129943d5287fc01eb3f654b` | PASS; capsule `2`, `PENDING` |
-| Cancel capsule | `0x329f7e3460faf666899ebc3c4ed827129e23a8fc36f2063e9e82034814970195` | PASS; capsule `2`, `CANCELLED` |
-| Safe resolve | `0xd72c3bd2817b62ce6c6231b1e5d88d081a63187e96a459f92169ff88c14bbc03` | PASS; capsule `1`, `SAFE`, risk mask `0`, two grounded excerpts |
+| Open safe inspection | `0x6904fced0e3e692192a65413dd417bed99acce7ac65c6b1dd2c3160447cac224` | PASS; capsule `1`, `PENDING` |
+| Safe resolve | `0x47703a64c766f1955452b8863cd0988982e04008c310df939737e8459ee095ea` | PASS; capsule `1`, `SAFE`, risk mask `0`, grounded excerpt returned |
 | Safe `is_consumable(1)` | — | `true` |
-| Open hostile inspection | `0xfa6a8fd965f0b06c4e1dcff99f421de673a2b9bc698e57fa14510ffc6dc2d5ac` | PASS; capsule `3`, `PENDING` |
-| Hostile resolve | `0xa2b2c6fb4c858016098b94f190e3c87e5b4d1274ad8ff49eb459bd43a2f76d51` | PASS; capsule `3`, `QUARANTINED`, risk mask `265` (`PROMPT_OVERRIDE`, `SECRET_EXFILTRATION`, `LITERAL_CONTROL_PHRASE`) |
+| Open cancellation inspection | `0xdb80094dfb070ced1b1247f1c8779f67a05e17744777533b01f4f5b85fa96482` | PASS; capsule `2` |
+| Cancel capsule | `0x56e7e14c9826dd5c4c386a528cbd7d8afdfc6bf40e25bceb1a5990d8a24f6052` | PASS; capsule `2`, `CANCELLED` |
+| Open hostile inspection | `0x33dbc89ace583008e17c3982733d5368eae558adccb3940912e331db7367e959` | PASS; capsule `3` |
+| Hostile resolve | `0x1b0c6f3d6f4cf6d5385f5407d622a5c16d2b9dda5fffeef9fbb762ea4d9d450a` | PASS; capsule `3`, `QUARANTINED`, risk mask `265` (`PROMPT_OVERRIDE`, `SECRET_EXFILTRATION`, `LITERAL_CONTROL_PHRASE`) |
 | Hostile `is_consumable(3)` | — | `false` |
 
 The hostile source was the public fixture added at commit `daf1fc1`:
@@ -62,4 +61,4 @@ The first inspection attempt used CLI arguments prefixed with `str:`. The CLI en
 
 Its receipt reached `ACCEPTED` with the contract rollback payload. The CLI trace request was also attempted, but Studionet returned `Method not found: gen_dbg_traceTransaction`; the receipt contained the complete rollback reason. Retrying with plain string arguments succeeded.
 
-The safe resolve receipt recorded one validator disagreement while consensus accepted the transaction; the resulting capsule was `SAFE` and consumable. The hostile resolve receipt recorded two validator disagreements while consensus accepted the transaction; the resulting capsule was `QUARANTINED` and not consumable.
+The fresh safe and hostile resolve receipts reached `ACCEPTED` / `MAJORITY_AGREE`; the resulting capsules were respectively `SAFE` and `QUARANTINED`, with consumption results `true` and `false`.

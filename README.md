@@ -35,13 +35,13 @@ Only a `SAFE` capsule with at least one validator-grounded excerpt returns `is_c
 | Network | Studionet |
 | Contract | `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5` |
 | Deployment tx | `0x277e11d40d3247b423017b12d47be884ccf5630a4bd6eb45942a184969f1dc72` |
-| Deployment state | `ACCEPTED`, `MAJORITY_AGREE` |
-| Deployment source | `594d324` |
+| Deployment state | `FINALIZED`, `MAJORITY_AGREE` |
+| Deployment source | `594d32439eb67af666bc69935ff161ababc58741` |
 | Deployment method | official genlayer-test Studio Mode |
 
 The deployable `contracts/ingress.py` on current `main` is unchanged from the deployed source commit. Later commits add the hostile public fixture and documentation/evidence only. Full transaction evidence is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
-Live smoke verification includes a real safe source resolving to `SAFE` with two grounded excerpts and `is_consumable == true`, and a hostile public fixture resolving to `QUARANTINED` with `is_consumable == false`.
+Live smoke verification against this address includes safe open `0x6904fced0e3e692192a65413dd417bed99acce7ac65c6b1dd2c3160447cac224`, safe resolve `0x47703a64c766f1955452b8863cd0988982e04008c310df939737e8459ee095ea` (`SAFE`, risk `0`, consumable `true`), cancellation `0x56e7e14c9826dd5c4c386a528cbd7d8afdfc6bf40e25bceb1a5990d8a24f6052` (`CANCELLED`), and hostile resolve `0x1b0c6f3d6f4cf6d5385f5407d622a5c16d2b9dda5fffeef9fbb762ea4d9d450a` (`QUARANTINED`, risk `265`, consumable `false`).
 
 ## 30-second reviewer version
 
@@ -408,7 +408,7 @@ Returns the fixed diagnostic risk dictionary.
 | GenVM linter | PASS | `genvm-lint check contracts/ingress.py --json`, genvm-linter `0.11.0`, exit `0` |
 | GenLayer CLI | PASS | official CLI `0.39.2`; Studionet RPC reachable |
 | Studionet deployment | PASS | finalized contract and deployment transaction recorded above |
-| Live safe evidence | PASS | capsule `1`: `SAFE`, risk `0`, two grounded excerpts, consumable `true` |
+| Live safe evidence | PASS | capsule `1`: `SAFE`, risk `0`, grounded excerpt, consumable `true` |
 | Live hostile evidence | PASS | capsule `3`: `QUARANTINED`, risk `265`, consumable `false` |
 
 Direct Mode executed the real contract after an external, uncommitted Windows compatibility shim deferred a `genlayer-test` temporary-file cleanup bug. No contract change was needed for that harness issue.
@@ -468,7 +468,7 @@ The verified deployment and every smoke transaction are recorded in [`docs/DEPLO
 | `get_risk_dictionary()` | all 10 expected entries returned |
 | Open safe inspection | capsule `1`, `PENDING` |
 | Open + cancel disposable inspection | capsule `2`, `CANCELLED` |
-| Resolve safe public source | capsule `1`, `SAFE`, risk `0`, two grounded excerpts |
+| Resolve safe public source | capsule `1`, `SAFE`, risk `0`, grounded excerpt |
 | `is_consumable(1)` | `true` |
 | Resolve hostile public fixture | capsule `3`, `QUARANTINED`, risk `265` |
 | `is_consumable(3)` | `false` |

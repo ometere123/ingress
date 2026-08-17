@@ -15,8 +15,8 @@ Ingress is a reusable consensus firewall that screens untrusted live web content
 - Repository: `https://github.com/ometere123/ingress`
 - Studionet contract: `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5`
 - Deployment transaction: `0x277e11d40d3247b423017b12d47be884ccf5630a4bd6eb45942a184969f1dc72`
-- Deployment state: `ACCEPTED`, `MAJORITY_AGREE`
-- Deployment source commit: `594d324`
+- Deployment state: `FINALIZED`, `MAJORITY_AGREE`
+- Deployment source commit: `594d32439eb67af666bc69935ff161ababc58741`
 - Deployment method: official genlayer-test Studio Mode
 - Full deployment/smoke evidence: `docs/DEPLOYMENT.md`
 
@@ -116,8 +116,8 @@ The model reports observations. Deterministic contract code decides what those o
 | Pickling | **PASS**, `check_pickling=True` |
 | GenLayer CLI | **PASS**, `0.39.2` |
 | Studionet deployment | **PASS**, finalized |
-| Safe live source | **PASS**, `SAFE`, risk `0`, two grounded excerpts, consumable `true` |
-| Hostile live fixture | **PASS**, `QUARANTINED`, risk `265`, consumable `false` |
+| Safe live source | **PASS**, resolve `0x47703a64c766f1955452b8863cd0988982e04008c310df939737e8459ee095ea`, `SAFE`, risk `0`, grounded excerpt, consumable `true` |
+| Hostile live fixture | **PASS**, resolve `0x1b0c6f3d6f4cf6d5385f5407d622a5c16d2b9dda5fffeef9fbb762ea4d9d450a`, `QUARANTINED`, risk `265`, consumable `false` |
 | GenVM linter | **PASS**, published `genvm-linter==0.11.0`, `check --json` exit `0` |
 
 The Direct Mode Windows harness required an external, uncommitted temporary-file cleanup shim. No contract change was required to obtain the 19/19 result.
@@ -128,13 +128,13 @@ The primary GenVM linter gate is green; its only output warning was informationa
 
 The safe Studionet resolution transaction:
 
-`0xd72c3bd2817b62ce6c6231b1e5d88d081a63187e96a459f92169ff88c14bbc03`
+`0x47703a64c766f1955452b8863cd0988982e04008c310df939737e8459ee095ea`
 
-resolved capsule `1` to `SAFE`, risk mask `0`, with two grounded excerpts. `is_consumable(1)` returned `true`.
+resolved capsule `1` to `SAFE`, risk mask `0`, with a grounded excerpt. `is_consumable(1)` returned `true`.
 
 The hostile Studionet resolution transaction:
 
-`0xa2b2c6fb4c858016098b94f190e3c87e5b4d1274ad8ff49eb459bd43a2f76d51`
+`0x1b0c6f3d6f4cf6d5385f5407d622a5c16d2b9dda5fffeef9fbb762ea4d9d450a`
 
 resolved capsule `3` to `QUARANTINED`, risk mask `265` (`PROMPT_OVERRIDE`, `SECRET_EXFILTRATION`, `LITERAL_CONTROL_PHRASE`). `is_consumable(3)` returned `false`.
 

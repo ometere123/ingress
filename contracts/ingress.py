@@ -132,9 +132,6 @@ def host_of(url: str) -> str:
             text = text[:index]
     if "@" in text:
         return ""
-    # Explicit ports are rejected. This keeps the primitive away from common
-    # internal-service probing shapes without pretending to be a full DNS SSRF
-    # firewall.
     if ":" in text:
         return ""
     return text.strip(".")
@@ -142,7 +139,6 @@ def host_of(url: str) -> str:
 
 def is_valid_host_shape(host: str) -> bool:
     """Accept conservative ASCII DNS names; reject ambiguous URL host syntax."""
-
     if len(host) == 0 or len(host) > 253 or "." not in host:
         return False
     if "%" in host or "\\" in host:
@@ -162,10 +158,8 @@ def is_valid_host_shape(host: str) -> bool:
             ):
                 return False
 
-    # Reject numeric-only forms entirely. Browsers and resolvers historically
-    # accept several non-canonical IP spellings (for example 127.1, a decimal
-    # integer, or octal-looking labels), and they are easy to misclassify with
-    # a hand-written IPv4 parser.
+    # Reject numeric-only host spellings entirely. Resolvers historically
+    # accept several ambiguous encodings that a dotted-quad parser may miss.
     if all(label.isdigit() for label in labels):
         return False
     return True
@@ -199,10 +193,8 @@ def is_blocked_host(host: str) -> bool:
     if host.endswith(".localhost") or host.endswith(".local") or host.endswith(".internal"):
         return True
 
-    # Catch DNS-wrapper forms that begin with a private dotted IPv4 address,
-    # such as 127.0.0.1.example.test. This is deliberately conservative. It is
-    # not a DNS-resolution guarantee; the GenVM web module still performs its
-    # own URL policy checks when the request executes.
+    # Catch DNS-wrapper forms beginning with a private IPv4 address, such as
+    # 127.0.0.1.example.test. GenVM still enforces its own URL policy too.
     parts = host.split(".")
     if len(parts) >= 4 and all(part.isdigit() for part in parts[:4]):
         if any(len(part) > 1 and part.startswith("0") for part in parts[:4]):
@@ -234,8 +226,6 @@ def lexical_risk_mask(text: str) -> int:
 
 def purpose_is_passive(purpose: str) -> bool:
     lower = purpose.lower()
-    # Purpose text influences extraction. Refuse the most obvious attempt to
-    # turn it into a second instruction channel.
     for phrase in CONTROL_PHRASES:
         if phrase in lower:
             return False
@@ -305,11 +295,11 @@ def normalise_excerpts(raw: typing.Any, source_text: str) -> list[str]:
         return []
     result: list[str] = []
     for entry in raw[:MAX_EXCERPTS]:
+        if not isinstance(entry, str):
+            continue
         excerpt = clean_text(entry, MAX_EXCERPT_LEN)
         if excerpt == "" or excerpt in result:
             continue
-        # Evidence is source-anchored. Normalise source whitespace the same way
-        # before checking so page formatting churn does not create fake misses.
         if excerpt in clean_text(source_text, MAX_PAGE_CHARS):
             result.append(excerpt)
     return result
@@ -340,9 +330,6 @@ def risk_names(mask: int) -> list[str]:
 
 
 def analysis_prompt(source_text: str, purpose: str) -> str:
-    # JSON string framing keeps attacker-controlled newlines, quotes and marker
-    # words inside an explicit data value rather than letting page text create
-    # new top-level prompt sections.
     purpose_json = json.dumps(purpose, ensure_ascii=True)
     source_json = json.dumps(source_text[:MAX_PAGE_CHARS], ensure_ascii=True)
     return f"""You are a security classifier for untrusted web evidence.
@@ -430,7 +417,7 @@ class Ingress(gl.Contract):
     def _inspect(self, url: str, purpose: str) -> dict:
         """Leader proposes a bounded security capsule; validators re-derive it."""
 
-        def inspect_once() -> dict:
+        def inspect_once(include_source: bool = False) -> dict:
             try:
                 page = gl.nondet.web.render(url, mode="text")
                 source = str(page)[:MAX_PAGE_CHARS]
@@ -461,23 +448,29 @@ class Ingress(gl.Contract):
                 reason = clean_text(parsed.get("reason", ""), MAX_REASON_LEN)
                 excerpts = normalise_excerpts(parsed.get("excerpts", []), source)
             except Exception as exc:
-                return {
+                result = {
                     "reachable": True,
                     "risk_mask": floor | RISK_UNPARSABLE_ANALYSIS,
                     "reason": clean_text(f"analysis failed: {exc}", MAX_REASON_LEN),
                     "excerpts": [],
                 }
+                if include_source:
+                    result["source_text"] = source
+                return result
 
             mask = semantic | floor
-            return {
+            result = {
                 "reachable": True,
                 "risk_mask": mask,
                 "reason": reason,
                 "excerpts": excerpts,
             }
+            if include_source:
+                result["source_text"] = source
+            return result
 
         def leader_fn() -> dict:
-            return inspect_once()
+            return inspect_once(False)
 
         def validator_fn(leader_result) -> bool:
             if not isinstance(leader_result, gl.vm.Return):
@@ -487,40 +480,49 @@ class Ingress(gl.Contract):
                 return False
 
             try:
-                own = inspect_once()
+                own = inspect_once(True)
             except Exception:
                 return False
 
-            # Reachability disagreement is substantive: one node cannot release
-            # evidence that another node could not independently observe.
-            if bool(leader.get("reachable", False)) != bool(own.get("reachable", False)):
+            # Reachability is a typed decision field, not Python truthiness.
+            leader_reachable = leader.get("reachable")
+            own_reachable = own.get("reachable")
+            if not isinstance(leader_reachable, bool) or not isinstance(own_reachable, bool):
                 return False
-            if not bool(leader.get("reachable", False)):
+            if leader_reachable != own_reachable:
+                return False
+            if not leader_reachable:
                 return True
 
-            try:
-                leader_mask = int(leader.get("risk_mask", RISK_UNPARSABLE_ANALYSIS))
-                own_mask = int(own.get("risk_mask", RISK_UNPARSABLE_ANALYSIS))
-            except Exception:
-                return False
+            leader_mask = leader.get("risk_mask")
+            own_mask = own.get("risk_mask")
+            for mask in (leader_mask, own_mask):
+                if isinstance(mask, bool) or not isinstance(mask, int):
+                    return False
+                if mask < 0 or mask & ~ALLOWED_RISK_MASK:
+                    return False
 
-            # The stable decision field is the derived security class. Validators
-            # independently re-fetch and re-classify rather than validating shape.
+            # Compare consensus-relevant security dimensions. Exact semantic
+            # category bits are diagnostic because models can label the same
+            # attack differently, but coarse risk presence and terminal class
+            # must independently agree.
+            if bool(leader_mask & SEMANTIC_RISK_MASK) != bool(own_mask & SEMANTIC_RISK_MASK):
+                return False
+            if bool(leader_mask & RISK_LITERAL_CONTROL_PHRASE) != bool(
+                own_mask & RISK_LITERAL_CONTROL_PHRASE
+            ):
+                return False
+            if bool(leader_mask & RISK_UNPARSABLE_ANALYSIS) != bool(
+                own_mask & RISK_UNPARSABLE_ANALYSIS
+            ):
+                return False
             if risk_class(leader_mask) != risk_class(own_mask):
                 return False
 
-            # The deterministic lexical floor can never disappear from the
-            # leader result when the validator observes it independently.
-            if own_mask & RISK_LITERAL_CONTROL_PHRASE and not leader_mask & RISK_LITERAL_CONTROL_PHRASE:
-                return False
-
-            # Re-fetch happened inside inspect_once. Anchor every leader excerpt
-            # against the validator's independently observed source by rendering
-            # once more in this validator. This costs a web read but removes the
-            # leader's ability to invent evidence.
-            try:
-                validator_page = str(gl.nondet.web.render(url, mode="text"))[:MAX_PAGE_CHARS]
-            except Exception:
+            # Classification and excerpt grounding use the same validator
+            # snapshot, avoiding a second-fetch time-of-check/time-of-use gap.
+            validator_page = own.get("source_text")
+            if not isinstance(validator_page, str) or validator_page == "":
                 return False
             normalized_page = clean_text(validator_page, MAX_PAGE_CHARS)
 
@@ -528,8 +530,10 @@ class Ingress(gl.Contract):
             if not isinstance(excerpts, list) or len(excerpts) > MAX_EXCERPTS:
                 return False
             for raw_excerpt in excerpts:
+                if not isinstance(raw_excerpt, str) or len(raw_excerpt) > MAX_EXCERPT_LEN:
+                    return False
                 excerpt = clean_text(raw_excerpt, MAX_EXCERPT_LEN)
-                if excerpt == "" or excerpt not in normalized_page:
+                if excerpt == "" or excerpt != raw_excerpt or excerpt not in normalized_page:
                     return False
                 try:
                     verdict = str(

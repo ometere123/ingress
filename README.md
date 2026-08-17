@@ -269,11 +269,12 @@ Returns the fixed diagnostic risk dictionary.
 |---|---|---|
 | SDK-free source preflight | PASS | `74/74` checks |
 | Python source compilation | PASS | contract and deployment/preflight scripts compile |
-| Direct Mode | ENVIRONMENT BLOCKED | `genlayer-test v0.29.2` installed, but all `19` tests stop in its Windows fd-0 temp-file cleanup with `PermissionError [WinError 32]` before contract loading |
+| Direct Mode | PASS | `19 passed` with `genlayer-test v0.29.2`, Python 3.12.13, strict mocks, and pickling checks enabled; a temporary external Windows unlink shim was required for the harness bug |
 | GenVM linter | ENVIRONMENT BLOCKED | `genvm-linter v0.11.0` source installation did not produce an installed package/CLI in this runtime; no pass is claimed |
-| Studionet deployment | NOT ATTEMPTED | `genlayer` CLI is not on PATH; no account, transaction, or address is claimed |
+| GenLayer CLI | PASS | official CLI `0.39.2` installed; Studionet selected; RPC reachable |
+| Studionet deployment | BLOCKED ON ACCOUNT | CLI secure store contains no accounts; no transaction or address is claimed |
 
-The Direct Mode result is a harness/platform blocker, not a contract test pass. The exact failing frame is `gltest.direct.loader._inject_message_to_fd0`, where the harness tries to unlink a still-open temporary file on Windows. No deployment evidence is included because the required CLI and signer are unavailable.
+Direct Mode executed the contract successfully after an external, uncommitted Windows compatibility shim deferred the harness's unlink of an fd-0 temp file. Deployment evidence is not included because the official CLI has no configured account in this environment.
 
 The linter is **not** required to run the primary test path.
 

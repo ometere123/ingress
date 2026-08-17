@@ -104,9 +104,10 @@ The launcher does not accept a private key and does not invoke `genvm-lint`.
 
 - SDK-free preflight: **PASS, 74/74 checks**.
 - Python compilation: **PASS**.
-- Direct Mode: **environment blocked** after installing `genlayer-test v0.29.2`; all 19 collected tests fail in the Windows harness's fd-0 temporary-file cleanup before the contract loads. No Direct Mode pass is claimed.
+- Direct Mode: **PASS, 19 passed** with `genlayer-test v0.29.2`, Python 3.12.13, strict mocks, and pickling checks enabled. A temporary external Windows compatibility shim was required for the harness's fd-0 temporary-file cleanup bug.
 - GenVM linter: **environment blocked**; the v0.11.0 source install did not expose an installed linter CLI in this runtime.
-- Studionet: **not attempted** because `genlayer` CLI is unavailable. No signer, address, transaction, or deployment claim is made.
+- GenLayer CLI: **0.39.2 installed** and Studionet selected; the RPC endpoint is reachable.
+- Studionet: **blocked on account setup** because the CLI secure store contains no account. No signer, address, transaction, or deployment claim is made.
 
 ## What reviewers should inspect first
 

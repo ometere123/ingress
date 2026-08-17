@@ -1,4 +1,3 @@
-# Direct-mode test dependencies only. Intentionally excludes genvm-linter so
-# testing is not blocked when the linter SDK artifact is unavailable.
-genlayer-py @ git+https://github.com/genlayerlabs/genlayer-py@v0.18.0
+# Direct-mode tests only. genlayer-test 0.29.2 declares and installs its own
+# compatible genlayer-py range (>=0.13.0,<0.17.0). Intentionally no linter.
 genlayer-test @ git+https://github.com/genlayerlabs/genlayer-testing-suite@v0.29.2

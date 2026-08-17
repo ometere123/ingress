@@ -6,7 +6,7 @@ It is not a proof that arbitrary natural-language content is harmless.
 
 ## Assets protected
 
-Ingress protects downstream contracts and agents from automatically consuming web evidence that attempts to:
+Ingress protects downstream consumers from automatically ingesting source material that attempts to:
 
 - override governing instructions;
 - impersonate system/developer authority;
@@ -20,87 +20,136 @@ Ingress protects downstream contracts and agents from automatically consuming we
 
 ### Caller
 
-The caller is untrusted.
+The caller is untrusted and supplies only:
 
-The caller can provide only:
-
-- a public HTTPS URL;
+- a bounded HTTPS URL;
 - a bounded passive evidence purpose.
 
 The caller cannot submit the evidence body itself.
 
 ### Source
 
-The source is hostile by default. It may contain both legitimate evidence and adversarial instructions.
+The source is hostile by default. It can contain legitimate facts and adversarial instructions in the same rendered content.
 
 ### Leader
 
-The leader is not trusted to classify correctly. Its result must pass independent validator verification.
+The leader is not trusted to classify correctly or even to construct honestly typed result fields. Its proposal must pass independent validator verification.
 
 ### Validators
 
-The security assumption is GenLayer consensus itself. Ingress does not protect against a malicious validator majority that agrees on a false classification.
+The security assumption is GenLayer consensus itself. Ingress does not protect against a malicious validator majority that agrees on a false result.
 
 ### Downstream consumer
 
-Downstream contracts must use `is_consumable(capsule_id)` or enforce the equivalent rule. Treating `SUSPICIOUS`, `QUARANTINED`, `UNAVAILABLE`, or empty-evidence `SAFE` capsules as trusted content defeats the primitive.
+The preferred automatic gate is:
+
+```python
+ingress.is_consumable(capsule_id)
+```
+
+Treating `SUSPICIOUS`, `QUARANTINED`, `UNAVAILABLE`, `CANCELLED`, or empty-evidence `SAFE` capsules as trusted evidence defeats the primitive.
+
+Consumers should not base settlement on one exact semantic risk bit; those category bits are diagnostic. The stable decision is the derived security status and consumability gate.
 
 ## Fail-closed rules
 
-Ingress fails closed in the following cases:
-
 | Condition | Result |
 |---|---|
-| web source cannot be read | `UNAVAILABLE` |
+| source cannot be rendered | `UNAVAILABLE` |
 | classifier output cannot be parsed | `QUARANTINED` + `UNPARSABLE_ANALYSIS` |
-| classifier emits unsupported bits | `QUARANTINED` + `UNPARSABLE_ANALYSIS` |
+| classifier risk type is fractional/hex-like/unsupported | `QUARANTINED` + `UNPARSABLE_ANALYSIS` |
 | semantic machine-control risk found | `QUARANTINED` |
-| only deterministic literal tripwire fires | `SUSPICIOUS` |
-| no grounded excerpt exists | not consumable |
-| validator security class differs | validator rejects proposal |
-| validator cannot independently anchor excerpt | validator rejects proposal |
-| validator judges excerpt active/unrelated | validator rejects proposal |
+| deterministic literal floor only | `SUSPICIOUS` |
+| no grounded excerpt | not consumable |
+| validator security dimensions disagree | validator rejects proposal |
+| forged leader field has wrong type/unknown bits | validator rejects proposal |
+| excerpt is absent from validator snapshot | validator rejects proposal |
+| excerpt is active or irrelevant | validator rejects proposal |
 
-## URL admission and SSRF
+## URL admission and SSRF defence in depth
 
-Ingress rejects obvious dangerous URL forms before consensus:
+Before consensus, Ingress accepts only a deliberately conservative public HTTPS hostname shape.
+
+It rejects:
 
 - non-HTTPS URLs;
-- credentials embedded in URL authority;
+- credentials in the authority;
 - explicit ports;
 - localhost and `.localhost`;
 - `.local` and `.internal` names;
-- obvious IPv4 loopback, private, and link-local ranges.
+- ordinary IPv4 loopback/private/link-local forms;
+- numeric-only legacy IP spellings such as shortened or integer forms;
+- leading-zero, percent-encoded, backslash, or other ambiguous host syntax;
+- malformed DNS labels;
+- DNS-wrapper hostnames beginning with a private IPv4 prefix.
 
-This is defence in depth, not a complete DNS/network SSRF solution. DNS rebinding, unusual address encodings, future network features, proxy behaviour, and infrastructure-level routing rules remain outside the contract's deterministic visibility.
+This is defence in depth, not a complete DNS/network SSRF solution. Contract code cannot observe every resolver, proxy, routing, rebinding, or validator-infrastructure behaviour.
 
-Network operators should still enforce egress protections appropriate for validator infrastructure.
+Validator/network operators still need appropriate egress controls.
 
 ## Prompt isolation
 
-The classifier prompt explicitly marks source text as hostile data and forbids obeying, continuing, simulating, browsing from, or executing instructions from the source.
+Attacker-controlled natural language is framed as data rather than inserted as a free-form instruction section.
 
-That prompt is not considered sufficient security by itself. It is combined with:
+The classifier receives:
 
-- an independent validator classification;
-- a deterministic lexical floor;
-- source-anchored evidence;
-- a second independent excerpt safety/relevance judgment;
-- fail-closed status derivation.
+- `CALLER_PURPOSE_JSON`;
+- `UNTRUSTED_SOURCE_JSON`.
+
+The excerpt validator similarly receives JSON-framed purpose and candidate excerpt values.
+
+This makes newlines, quotes, and fake section-marker text part of encoded data rather than allowing them to create a new top-level prompt section.
+
+Prompt wording alone is not treated as a sufficient defence. It is combined with independent classification, deterministic lexical checks, strict result parsing, source grounding, and validator rejection on security disagreement.
+
+## Model-output hardening
+
+The semantic classifier is asked for structured JSON.
+
+`risk_mask` accepts only:
+
+- a Python integer; or
+- a decimal-digit string representing an integer.
+
+It rejects booleans, floats, hex-like strings, negative values, and unsupported semantic bits. Invalid classifier output becomes `UNPARSABLE_ANALYSIS`, which is quarantined.
+
+The custom validator separately validates leader fields because the leader proposal itself is untrusted. A forged unknown bit cannot be silently masked away into a safe result.
 
 ## Evidence anchoring
 
-The leader may propose only short evidence excerpts.
+The leader may propose at most a small bounded set of short excerpts.
 
-Each excerpt is normalised and accepted only if it occurs in the rendered source. Validators then independently render the source and repeat the anchoring check.
+Leader-side canonicalisation keeps only string excerpts that occur in the leader's rendered source.
 
-This prevents a leader from replacing hostile source text with a convenient safe paraphrase and presenting that paraphrase as evidence from the page.
+Every validator then independently renders and classifies its own source snapshot. The **same snapshot** is used to verify that each leader excerpt:
+
+- is a string;
+- is within the size bound;
+- is already canonical rather than changing meaning through validator normalisation;
+- occurs in the validator-observed source;
+- passes a separate passive/relevance judgment.
+
+Using one validator snapshot for classification and anchoring avoids a second-fetch time-of-check/time-of-use window.
+
+## Consensus equivalence and semantic labels
+
+Validators are not required to choose the identical fine-grained semantic category for the same hard attack. Two honest models may label the same text differently while agreeing it is unsafe.
+
+They must agree on:
+
+- reachability;
+- whether any semantic hard risk exists;
+- deterministic literal-floor presence;
+- analysis-failure presence;
+- terminal security class.
+
+A leader cannot therefore propose a consumable `SAFE` result when a validator independently observes any hard-risk dimension.
 
 ## What SAFE means
 
 `SAFE` means only:
 
-> The consensus path did not find evidence that this source is attempting to control the model/agent reading it, under the defined risk taxonomy.
+> The accepted consensus path did not identify source-directed machine-control risk under Ingress's defined observation and taxonomy.
 
 `SAFE` does **not** mean:
 
@@ -108,46 +157,52 @@ This prevents a leader from replacing hostile source text with a convenient safe
 - the source is authoritative;
 - the source is independent;
 - the source is fresh;
-- the evidence satisfies a market, escrow, insurance, or governance condition;
-- the page is free of malware for a normal browser;
+- the evidence is sufficient to settle a market, escrow, insurance policy, or governance action;
+- the page is safe for an ordinary browser;
 - the domain owner is trustworthy.
 
-Those are separate questions and should be handled by separate primitives.
+Those are separate primitives and policies.
 
 ## Known limitations
 
 ### Semantic false negatives
 
-Two or more validators may independently miss a novel or subtle attack. Consensus reduces single-model error and manipulation; it does not make language-model classification infallible.
+A validator majority can independently miss a novel or subtle attack. Consensus reduces single-model error and unilateral manipulation; it does not make natural-language security classification infallible.
 
 ### Semantic false positives
 
-Security research pages, documentation, and news articles can legitimately quote attack phrases. The LLM classifier is instructed to distinguish descriptive quotation from instructions directed at the reader. The deterministic lexical floor is intentionally conservative and may still mark such a page `SUSPICIOUS`.
+Security research, documentation, and news can quote attack language legitimately. The semantic classifier is instructed to reason about context, but the deterministic literal floor can still produce `SUSPICIOUS` on quoted control phrases.
 
-This is deliberate: `SUSPICIOUS` is a fail-closed middle state, not an accusation that the publisher is malicious.
+That middle state is intentionally fail closed; it is not an accusation against the publisher.
 
 ### Rendered-text boundary
 
-The current primitive classifies GenLayer's rendered text view. Content that is completely absent from that representation is outside the classifier's observation. This repository therefore does not claim perfect detection of CSS-hidden, script-generated, binary, image-based, or other non-rendered instruction channels.
+Ingress classifies GenLayer's rendered text view. Content absent from that representation is outside the current observation boundary, including some image, binary, script-only, or non-rendered channels.
 
-A future version can add raw-HTML and image passes as separate independently validated evidence channels rather than silently expanding the current guarantee.
+Future versions should add new observation channels explicitly rather than silently widening the current guarantee.
+
+### DNS/network visibility
+
+The deterministic hostname parser can reject many dangerous and ambiguous forms, but it cannot prove how every hostname will resolve at execution time. Network-layer protections remain complementary.
 
 ### Purpose interpretation
 
-Purpose is bounded and screened for obvious control language, but it is still natural language. Integrators should use stable, application-defined purpose templates rather than passing arbitrary end-user prompts when possible.
+Purpose is bounded, screened for obvious control language, and JSON-framed, but it remains natural language. Integrators should prefer stable application-defined purpose templates over arbitrary end-user prompts.
+
+### Diagnostic mask stability
+
+Fine-grained semantic category bits are not guaranteed to be identical across honest validators. Downstream settlement should use `status`/`is_consumable`, not a particular category bit.
 
 ## No privileged bypass
 
 There is no owner/admin method that can:
 
-- mark a quarantined capsule safe;
+- mark quarantined evidence safe;
 - edit a terminal capsule;
 - replace evidence;
-- disable the validator;
+- disable validator verification;
 - change the risk dictionary;
 - bypass `is_consumable`.
-
-This is intentional for a reusable security primitive.
 
 ## Integration rule
 
@@ -158,4 +213,4 @@ if not ingress.is_consumable(capsule_id):
     do not pass capsule excerpts into downstream nondeterministic reasoning
 ```
 
-Then apply any additional corroboration, freshness, policy, or settlement checks after the Ingress gate.
+Then apply truth corroboration, freshness, authority, policy, and settlement logic after the Ingress gate.

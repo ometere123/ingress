@@ -13,9 +13,10 @@ import typing
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "contracts" / "ingress.py"
 HELPERS = {
-    "clean_text", "host_of", "is_valid_host_shape", "is_private_ipv4_parts",
-    "is_blocked_host", "validate_url", "lexical_risk_mask", "purpose_is_passive",
-    "parse_json_object", "strict_risk_mask", "normalise_excerpts", "risk_class",
+    "clean_text", "current_datetime", "host_of", "is_valid_host_shape",
+    "is_private_ipv4_parts", "is_blocked_host", "validate_url",
+    "lexical_risk_mask", "purpose_is_passive", "parse_json_object",
+    "strict_risk_mask", "normalise_excerpts", "risk_class",
     "analysis_prompt", "validator_excerpt_prompt",
 }
 
@@ -118,12 +119,14 @@ def source_checks(source: str, tree: ast.Module) -> int:
     check(emits >= 3, f"emit count={emits}")
     count += 3
 
-    check("current_datetime()" not in source, "undefined current_datetime remains")
-    check(source.count('gl.message_raw["datetime"]') >= 3, "timestamp path missing")
+    check("def current_datetime()" in source, "transaction timestamp helper missing")
+    check(source.count("current_datetime()") >= 5, "timestamp helper is not used for lifecycle writes")
+    check('getattr(raw, "datetime", None)' in source, "production message.raw datetime path missing")
+    check('getattr(gl, "message_raw", None)' in source, "Direct Mode message_raw fallback missing")
     check('response_format="json"' in source, "structured classifier is not JSON mode")
     check("mask & ~ALLOWED_RISK_MASK" in source, "validator does not reject unknown mask bits")
     check('own.get("source_text")' in source, "validator is not bound to one source snapshot")
-    count += 5
+    count += 7
     return count
 
 
@@ -136,7 +139,13 @@ def load_helpers(tree: ast.Module) -> dict[str, typing.Any]:
             body.append(node)
     module = ast.Module(body=body, type_ignores=[])
     ast.fix_missing_locations(module)
-    gl = types.SimpleNamespace(vm=types.SimpleNamespace(UserError=UserError))
+    gl = types.SimpleNamespace(
+        vm=types.SimpleNamespace(UserError=UserError),
+        message=types.SimpleNamespace(
+            raw=types.SimpleNamespace(datetime="2026-08-17T12:00:00+00:00")
+        ),
+        message_raw={"datetime": "2026-08-17T11:00:00+00:00"},
+    )
     ns: dict[str, typing.Any] = {
         "json": json, "typing": typing, "gl": gl, "__builtins__": __builtins__
     }
@@ -147,6 +156,16 @@ def load_helpers(tree: ast.Module) -> dict[str, typing.Any]:
 
 def helper_checks(ns: dict[str, typing.Any]) -> int:
     count = 0
+
+    now = ns["current_datetime"]
+    gl = ns["gl"]
+    check(now() == "2026-08-17T12:00:00+00:00", "production timestamp shape failed")
+    gl.message.raw.datetime = None
+    check(now() == "2026-08-17T11:00:00+00:00", "Direct Mode timestamp fallback failed")
+    gl.message_raw = {}
+    check(now() == "", "missing timestamp should fail harmlessly to empty string")
+    count += 3
+
     valid = ns["validate_url"]
     for url in (
         "https://example.com/x", "https://docs.example.com/x",

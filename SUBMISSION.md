@@ -100,6 +100,14 @@ python scripts/deploy_studionet.py
 
 The launcher does not accept a private key and does not invoke `genvm-lint`.
 
+## Validation status of this checkout
+
+- SDK-free preflight: **PASS, 74/74 checks**.
+- Python compilation: **PASS**.
+- Direct Mode: **environment blocked** after installing `genlayer-test v0.29.2`; all 19 collected tests fail in the Windows harness's fd-0 temporary-file cleanup before the contract loads. No Direct Mode pass is claimed.
+- GenVM linter: **environment blocked**; the v0.11.0 source install did not expose an installed linter CLI in this runtime.
+- Studionet: **not attempted** because `genlayer` CLI is unavailable. No signer, address, transaction, or deployment claim is made.
+
 ## What reviewers should inspect first
 
 1. `contracts/ingress.py`

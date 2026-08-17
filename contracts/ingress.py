@@ -605,7 +605,16 @@ class Ingress(gl.Contract):
             raise gl.vm.UserError(f"{ERR_EXPECTED}: capsule is already terminal")
 
         result = self._inspect(str(capsule.url), str(capsule.purpose))
-        reachable = bool(result.get("reachable", False))
+        reachable = result.get("reachable")
+        if not isinstance(reachable, bool):
+            capsule.status = u8(STATUS_QUARANTINED)
+            capsule.risk_mask = u32(RISK_UNPARSABLE_ANALYSIS)
+            capsule.reason = "consensus returned malformed reachability"
+            capsule.resolved_at = current_datetime()
+            InspectionResolved(
+                capsule_id, u8(STATUS_QUARANTINED), risk_mask=RISK_UNPARSABLE_ANALYSIS
+            ).emit()
+            return
 
         if not reachable:
             capsule.status = u8(STATUS_UNAVAILABLE)
@@ -615,8 +624,13 @@ class Ingress(gl.Contract):
             InspectionResolved(capsule_id, u8(STATUS_UNAVAILABLE), risk_mask=0).emit()
             return
 
+        raw_mask = result.get("risk_mask", RISK_UNPARSABLE_ANALYSIS)
         try:
-            mask = int(result.get("risk_mask", RISK_UNPARSABLE_ANALYSIS)) & ALLOWED_RISK_MASK
+            if isinstance(raw_mask, bool) or not isinstance(raw_mask, int):
+                raise ValueError("consensus returned malformed risk mask")
+            if raw_mask < 0 or raw_mask & ~ALLOWED_RISK_MASK:
+                raise ValueError("consensus returned unsupported risk bits")
+            mask = raw_mask
         except Exception:
             mask = RISK_UNPARSABLE_ANALYSIS
         status = risk_class(mask)
@@ -631,6 +645,8 @@ class Ingress(gl.Contract):
         capsule.reason = clean_text(result.get("reason", ""), MAX_REASON_LEN)
         capsule.resolved_at = current_datetime()
         for excerpt in excerpts[:MAX_EXCERPTS]:
+            if not isinstance(excerpt, str):
+                continue
             value = clean_text(excerpt, MAX_EXCERPT_LEN)
             if value != "":
                 capsule.excerpts.append(value)

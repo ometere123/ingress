@@ -263,6 +263,18 @@ Returns the fixed diagnostic risk dictionary.
 
 ## Testing without `genvm-lint`
 
+## Validation results for this checkout
+
+| Gate | Result | Evidence |
+|---|---|---|
+| SDK-free source preflight | PASS | `74/74` checks |
+| Python source compilation | PASS | contract and deployment/preflight scripts compile |
+| Direct Mode | ENVIRONMENT BLOCKED | `genlayer-test v0.29.2` installed, but all `19` tests stop in its Windows fd-0 temp-file cleanup with `PermissionError [WinError 32]` before contract loading |
+| GenVM linter | ENVIRONMENT BLOCKED | `genvm-linter v0.11.0` source installation did not produce an installed package/CLI in this runtime; no pass is claimed |
+| Studionet deployment | NOT ATTEMPTED | `genlayer` CLI is not on PATH; no account, transaction, or address is claimed |
+
+The Direct Mode result is a harness/platform blocker, not a contract test pass. The exact failing frame is `gltest.direct.loader._inject_message_to_fd0`, where the harness tries to unlink a still-open temporary file on Windows. No deployment evidence is included because the required CLI and signer are unavailable.
+
 The linter is **not** required to run the primary test path.
 
 ### 1. Zero-dependency preflight

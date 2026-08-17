@@ -27,6 +27,12 @@ Deployment transaction:
 Status:
 `FINALIZED`, `MAJORITY_AGREE`
 
+## Source parity
+
+The deployed source is commit `75a965eaa8760c26fe86fa8918c690ca150702ae`.
+
+`contracts/ingress.py` has not changed after that deployment source commit. Subsequent repository commits add the hostile evidence fixture and reviewer/deployment documentation only, so the deployable contract on current `main` remains byte-identical to the contract that was deployed and smoke-tested below.
+
 ## Runtime verification
 
 | Action | Transaction | Result |

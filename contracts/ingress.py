@@ -140,30 +140,75 @@ def host_of(url: str) -> str:
     return text.strip(".")
 
 
+def is_valid_host_shape(host: str) -> bool:
+    """Accept conservative ASCII DNS names; reject ambiguous URL host syntax."""
+
+    if len(host) == 0 or len(host) > 253 or "." not in host:
+        return False
+    if "%" in host or "\\" in host:
+        return False
+
+    labels = host.split(".")
+    for label in labels:
+        if len(label) == 0 or len(label) > 63:
+            return False
+        if label[0] == "-" or label[-1] == "-":
+            return False
+        for char in label:
+            if not (
+                ("a" <= char <= "z")
+                or ("0" <= char <= "9")
+                or char == "-"
+            ):
+                return False
+
+    # Reject numeric-only forms entirely. Browsers and resolvers historically
+    # accept several non-canonical IP spellings (for example 127.1, a decimal
+    # integer, or octal-looking labels), and they are easy to misclassify with
+    # a hand-written IPv4 parser.
+    if all(label.isdigit() for label in labels):
+        return False
+    return True
+
+
+def is_private_ipv4_parts(parts: list[str]) -> bool:
+    if len(parts) != 4:
+        return False
+    try:
+        nums = [int(part) for part in parts]
+    except Exception:
+        return False
+    if not all(0 <= number <= 255 for number in nums):
+        return False
+    if nums[0] in (0, 10, 127):
+        return True
+    if nums[0] == 169 and nums[1] == 254:
+        return True
+    if nums[0] == 172 and 16 <= nums[1] <= 31:
+        return True
+    if nums[0] == 192 and nums[1] == 168:
+        return True
+    return False
+
+
 def is_blocked_host(host: str) -> bool:
-    if host == "":
+    if not is_valid_host_shape(host):
         return True
     if host in ("localhost", "localhost.localdomain"):
         return True
     if host.endswith(".localhost") or host.endswith(".local") or host.endswith(".internal"):
         return True
 
-    # Conservative checks for obvious IPv4 private/link-local/loopback ranges.
+    # Catch DNS-wrapper forms that begin with a private dotted IPv4 address,
+    # such as 127.0.0.1.example.test. This is deliberately conservative. It is
+    # not a DNS-resolution guarantee; the GenVM web module still performs its
+    # own URL policy checks when the request executes.
     parts = host.split(".")
-    if len(parts) == 4:
-        try:
-            nums = [int(p) for p in parts]
-        except Exception:
-            nums = []
-        if len(nums) == 4 and all(0 <= n <= 255 for n in nums):
-            if nums[0] in (0, 10, 127):
-                return True
-            if nums[0] == 169 and nums[1] == 254:
-                return True
-            if nums[0] == 172 and 16 <= nums[1] <= 31:
-                return True
-            if nums[0] == 192 and nums[1] == 168:
-                return True
+    if len(parts) >= 4 and all(part.isdigit() for part in parts[:4]):
+        if any(len(part) > 1 and part.startswith("0") for part in parts[:4]):
+            return True
+        if is_private_ipv4_parts(parts[:4]):
+            return True
     return False
 
 

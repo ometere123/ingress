@@ -1,4 +1,9 @@
-"""High-signal live Studionet coverage for the deployed Ingress primitive."""
+"""High-signal live Studionet coverage for the deployed Ingress primitive.
+
+Each test gets a fresh disposable deployment so every case is independently
+runnable and never relies on pytest execution order or capsule IDs created by
+another test.
+"""
 
 import pytest
 from gltest import get_contract_factory, get_default_account
@@ -6,7 +11,6 @@ from gltest.assertions import tx_execution_succeeded
 
 
 CONTRACT = "ingress.py"
-ADDRESS = None
 SAFE_URL = "https://example.com/"
 HOSTILE_URL = (
     "https://raw.githubusercontent.com/ometere123/ingress/main/"
@@ -29,7 +33,7 @@ EXPECTED_RISK_DICTIONARY = {
 }
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def deployed_contract():
     factory = get_contract_factory(contract_file_path=CONTRACT)
     contract = factory.deploy(
@@ -71,7 +75,9 @@ def test_hostile_source_is_not_consumable(deployed_contract):
     opened = deployed_contract.open_inspection([HOSTILE_URL, PURPOSE]).transact(**TX_KW)
     assert_success(opened)
 
-    capsule_id = 2
+    capsule_id = 1
+    assert deployed_contract.get_capsule([capsule_id]).call()["status"] == 0
+
     resolved = deployed_contract.resolve([capsule_id]).transact(**TX_KW)
     assert_success(resolved)
 
@@ -88,7 +94,7 @@ def test_cancellation_is_terminal_and_not_consumable(deployed_contract):
     ).transact(**TX_KW)
     assert_success(opened)
 
-    capsule_id = 3
+    capsule_id = 1
     assert deployed_contract.get_capsule([capsule_id]).call()["status"] == 0
 
     cancelled = deployed_contract.cancel([capsule_id]).transact(**TX_KW)

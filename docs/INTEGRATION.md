@@ -34,6 +34,20 @@ class IIngress:
 
 A downstream contract can declare the same interface locally and call the deployed Ingress address.
 
+## Stable decision surface
+
+For automatic downstream decisions, prefer:
+
+```python
+ingress.view().is_consumable(capsule_id)
+```
+
+or, when richer inspection is required, the derived `status` plus the grounded `excerpts`.
+
+The fine-grained semantic bits returned in `risk_mask` are diagnostic labels. Honest validators can recognise the same unsafe source while choosing different semantic labels. Do not make payouts, slashing, or other settlement depend on one exact semantic category bit.
+
+`get_risk_dictionary()` remains useful for diagnostics, observability, and version-aware tooling, but it is not the primary settlement API.
+
 ## Example: evidence-gated settlement
 
 The following is intentionally documentation code rather than another `.py` file under `contracts/`. Keeping only one deployable contract in this repository prevents automated review tools from treating composition examples as additional contract submissions.
@@ -110,8 +124,8 @@ Ingress should remain ignorant of every one of those application domains.
 A production consumer should pin:
 
 - a deployed Ingress contract address;
-- the risk dictionary expected by that integration;
-- the semantic meaning of `is_consumable`.
+- the semantic meaning of `status` and `is_consumable`;
+- any risk-dictionary version used for diagnostics or observability.
 
 If a future Ingress version expands its observation surface, risk taxonomy, or validator policy, deploy it as a new version rather than silently changing the meaning of already-issued capsules.
 
@@ -121,5 +135,6 @@ If a future Ingress version expands its observation surface, risk taxonomy, or v
 - Resolve the capsule before use.
 - Require `is_consumable == true`.
 - Consume only `excerpts`, never re-fetch and blindly pass the whole source downstream.
+- Treat exact semantic risk bits as diagnostic, not settlement-critical.
 - Apply truth/corroboration/freshness checks separately.
 - Do not add an admin override that turns a failed Ingress result into trusted evidence.

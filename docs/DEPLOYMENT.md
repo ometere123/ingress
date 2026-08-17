@@ -31,9 +31,11 @@ Status:
 
 The deployed source is commit `594d324`.
 
-`contracts/ingress.py` has not changed after that deployment source commit. Subsequent repository commits add reviewer/deployment documentation only.
+`contracts/ingress.py` has not changed after that deployment source commit. Subsequent repository commits affect only tests, tooling dependencies, fixtures and documentation; the deployable contract source remains identical.
 
 All runtime transactions below target the lint-clean deployment above. The earlier pre-linter safe/hostile transactions are historical and intentionally omitted from this current-runtime table.
+
+The committed `tests/integration/test_ingress_studionet.py` suite independently redeploys the unchanged contract through official Studio Mode for reproducibility; those disposable test deployments do not replace the canonical address recorded above.
 
 ## Runtime verification
 

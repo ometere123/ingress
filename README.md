@@ -1,6 +1,16 @@
-# Ingress
+<h1 align="center">Ingress</h1>
 
-**A reusable GenLayer Intelligent Contract that screens hostile web content before another contract or agent is allowed to treat it as evidence.**
+<p align="center"><b>A reusable GenLayer consensus firewall for hostile web evidence.</b></p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/GenLayer-Intelligent%20Contract-111111" alt="GenLayer Intelligent Contract" />
+  <img src="https://img.shields.io/badge/Direct%20Mode-19%2F19%20passing-111111" alt="19 of 19 Direct Mode tests passing" />
+  <img src="https://img.shields.io/badge/preflight-74%2F74%20passing-111111" alt="74 of 74 preflight checks passing" />
+  <img src="https://img.shields.io/badge/Studionet-FINALIZED-111111" alt="Studionet deployment finalized" />
+  <img src="https://img.shields.io/badge/license-MIT-111111" alt="MIT license" />
+</p>
+
+**Ingress screens untrusted live web content before another Intelligent Contract or agent is allowed to treat that content as evidence.** It independently re-observes hostile sources under GenLayer consensus, fails closed on malformed or unsafe analysis, and releases only bounded, validator-grounded passive excerpts.
 
 Ingress is deliberately **contract-only**. There is no frontend, dashboard, wallet flow, backend product, indexer, or application-specific settlement experience in this repository.
 
@@ -18,9 +28,32 @@ resolve(capsule_id)
 
 Only a `SAFE` capsule with at least one validator-grounded excerpt returns `is_consumable(capsule_id) == true`.
 
-## Why Ingress exists
+## Live Studionet deployment
 
-GenLayer Intelligent Contracts can read the live web and use LLMs to interpret what they read. That creates a security boundary ordinary oracle designs do not have: a source can contain a useful fact and, in the same content, contain text intended to control the model reading it.
+| Evidence | Value |
+|---|---|
+| Network | Studionet |
+| Contract | `0xd7fe4E83829E357CB192071F05Fa5416A1ae485F` |
+| Deployment tx | `0xa9091bd32f5f3b5d5de3c17ce1b04c3545cd1d46df79dbdfbf02acd48bc2605b` |
+| Deployment state | `FINALIZED`, `MAJORITY_AGREE` |
+| Deployment source | `75a965eaa8760c26fe86fa8918c690ca150702ae` |
+| CLI | GenLayer CLI `0.39.2` |
+
+The deployable `contracts/ingress.py` on current `main` is unchanged from the deployed source commit. Later commits add the hostile public fixture and documentation/evidence only. Full transaction evidence is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+Live smoke verification includes a real safe source resolving to `SAFE` with two grounded excerpts and `is_consumable == true`, and a hostile public fixture resolving to `QUARANTINED` with `is_consumable == false`.
+
+## 30-second reviewer version
+
+Ingress solves one narrow reusable problem: **how can a downstream Intelligent Contract consume live web evidence without blindly letting the page itself instruct or redirect the model reading it?**
+
+The caller provides a URL and a bounded passive evidence purpose. The leader fetches and classifies the live source. Validators independently fetch and classify it again, reject malformed or forged leader fields, ground every proposed excerpt in their own observed source snapshot, and independently judge whether each released excerpt is passive and relevant. Deterministic contract code then derives the terminal status.
+
+The model never directly writes `SAFE`, `SUSPICIOUS`, or `QUARANTINED`.
+
+## The problem
+
+GenLayer Intelligent Contracts can read the live web and use LLMs to interpret what they read. That creates a security boundary ordinary oracle designs do not have: a page may contain a useful fact and, in the same content, contain text intended to control the model reading it.
 
 Examples include instructions to ignore governing prompts, impersonate system authority, expose secrets, call tools, transact, download something, or follow another page for further instructions.
 
@@ -38,11 +71,48 @@ A central content-safety API simply replaces one trust problem with another oper
 
 Ingress needs all three of these properties:
 
-1. **live web access** so validators observe the source rather than trusting caller-supplied text;
-2. **semantic reasoning** because machine-directed manipulation cannot be completely reduced to substring rules;
-3. **independent consensus** so a single model invocation cannot decide what another contract may trust.
+1. **Live web access** so the source is observed by the contract execution rather than accepted from caller-supplied text.
+2. **Semantic reasoning** because machine-directed manipulation cannot be completely reduced to substring rules.
+3. **Independent consensus** so one model invocation cannot unilaterally decide what another contract may trust.
 
-The leader proposes an observation. Validators independently fetch and classify the source before accepting it.
+The leader proposes an observation. Validators independently re-fetch and re-classify the source before accepting it.
+
+### Delete GenLayer: what breaks?
+
+| Replacement | What is lost |
+|---|---|
+| Central safety API | One operator becomes the authority deciding what downstream contracts may trust. |
+| One off-chain LLM | The caller/operator can choose the model output and report it selectively. |
+| Regex/string filter | Obvious phrases can be caught, but paraphrased, contextual and obfuscated machine-control attempts escape purely lexical rules. |
+| Format-only validator | Valid JSON can still contain a forged safe verdict or invented evidence. |
+| Caller-supplied page text | The caller controls the evidence being judged, so the contract no longer observes the source independently. |
+
+The load-bearing GenLayer property is that validators independently observe and reason about the same external source, then accept only a substantively equivalent security result.
+
+## Why this is not the rejected pattern
+
+| Anti-pattern | Why Ingress is different |
+|---|---|
+| “AI decides X” | The LLM reports bounded observations and risk findings; deterministic code derives the terminal state and consumption gate. |
+| Thin LLM wrapper | URL admission, lexical floors, typed parsing, custom validator logic, source grounding, terminal-state rules and fail-closed behavior surround the model call. |
+| Format-only validator | Validators independently re-fetch/re-classify and can reject a perfectly well-formed leader proposal on substantive security disagreement. |
+| User-submitted text judge | The caller supplies a URL; the source content is fetched inside the nondeterministic consensus path. |
+| Generic web oracle | Ingress does not decide whether a fact is true. It decides whether source content may be released forward as passive evidence. |
+| Full application | There is one deployable contract and no frontend/product flow. |
+
+## Standalone contract mission fit
+
+| Requirement | Ingress implementation |
+|---|---|
+| Standalone reusable contract | One deployable `contracts/ingress.py`; no application layer |
+| Real GenLayer consensus | Custom `gl.vm.run_nondet_unsafe` leader/validator flow |
+| Clear state design | `PENDING` to immutable terminal evidence-security capsules |
+| Thoughtful validator/equivalence logic | Independent re-fetch, re-classification, typed forged-leader checks, security-dimension equivalence and excerpt verification |
+| Meaningful beyond a demo | Reusable intake gate for prediction, insurance, governance, policy, agent and corroboration contracts |
+| Readable source | Bounded helpers, fixed risk taxonomy and deterministic terminal derivation |
+| Documentation | Consensus, security, integration and real deployment evidence docs |
+| Tests | 74/74 source preflight checks, 19/19 Direct Mode tests, pickling enabled, live Studionet smoke evidence |
+| Not a Project submission | No frontend, dashboard, wallet UX, backend or settlement-specific workflow |
 
 ## Contract boundary
 
@@ -58,16 +128,49 @@ Supporting material:
 tests/direct/                    Direct Mode security and state tests
 scripts/preflight.py             zero-dependency source/security preflight
 scripts/deploy_studionet.py      unlocked-account Studionet deployment helper
+fixtures/hostile_evidence.txt    public hostile source used in live verification
 requirements-test.txt            Direct Mode deps, intentionally no linter
 requirements.txt                 optional full tooling, including linter
 docs/CONSENSUS.md                custom validator design
 docs/SECURITY.md                 threat model and limitations
 docs/INTEGRATION.md              downstream composition example
-SUBMISSION.md                    reviewer-oriented summary
+docs/DEPLOYMENT.md               real Studionet deployment/smoke evidence
+SUBMISSION.md                    reviewer-oriented submission copy
 gltest.config.yaml               GenLayer test configuration
 ```
 
-No frontend is required or intended for this standalone Intelligent Contract submission.
+## Architecture
+
+```text
+untrusted live URL
+       |
+       v
+ deterministic admission
+       |
+       v
+ leader fetch + classify
+       |
+       v
+validators independently
+  fetch + classify
+       |
+       v
+security-dimension agreement
+       |
+       +--> reject forged / disagreeing leader result
+       |
+       v
+excerpt grounding + passive/relevance verification
+       |
+       v
+ deterministic terminal status
+       |
+       v
+typed evidence-security capsule
+       |
+       v
+ downstream truth / policy / settlement primitive
+```
 
 ## State model
 
@@ -103,8 +206,6 @@ There is no owner, administrator, mutable allowlist, or privileged safety overri
 
 ## Risk taxonomy
 
-The semantic classifier uses these fixed bits:
-
 | Bit | Name | Meaning |
 |---:|---|---|
 | `1` | `PROMPT_OVERRIDE` | tries to replace governing instructions |
@@ -113,7 +214,7 @@ The semantic classifier uses these fixed bits:
 | `8` | `SECRET_EXFILTRATION` | requests hidden prompts, credentials, keys, or secrets |
 | `16` | `TOOL_OR_ACTION_COMMAND` | asks the reader to execute code, call tools, transact, message, download, or otherwise act |
 | `32` | `OBFUSCATED_INSTRUCTION` | disguised machine-directed instruction |
-| `64` | `HIDDEN_INSTRUCTION` | non-visible machine-directed instruction represented in the rendered text |
+| `64` | `HIDDEN_INSTRUCTION` | non-visible machine-directed instruction represented in rendered text |
 | `128` | `EXTERNAL_INSTRUCTION_CHAIN` | sends the reader elsewhere to continue instructions |
 | `256` | `LITERAL_CONTROL_PHRASE` | deterministic lexical floor |
 | `512` | `UNPARSABLE_ANALYSIS` | classification could not be safely parsed |
@@ -128,11 +229,11 @@ no risk dimensions present     -> SAFE
 fetch unavailable              -> UNAVAILABLE
 ```
 
-The LLM never writes `SAFE`, `SUSPICIOUS`, or `QUARANTINED` directly.
+The LLM never writes the terminal state directly.
 
-### Important integration rule about the bitmask
+### Stable integration rule
 
-The individual semantic category bits are **diagnostic labels**, not a stable settlement API. Two honest validators can recognise the same malicious source but categorise it as different hard-risk bits.
+Fine-grained semantic category bits are **diagnostic labels**, not the settlement API. Two honest validators can recognize the same malicious source while assigning different semantic subcategories.
 
 Consensus therefore requires agreement on security-relevant dimensions:
 
@@ -142,7 +243,7 @@ Consensus therefore requires agreement on security-relevant dimensions:
 - whether analysis failed to parse safely;
 - the derived terminal security class.
 
-Downstream automatic decisions should use `status` or, preferably, `is_consumable()`. Do not make payout logic depend on one exact semantic category bit.
+Downstream automatic decisions should use `status` or, preferably, `is_consumable()`. Do not make payout or privileged logic depend on one exact semantic category bit.
 
 ## Consensus design
 
@@ -164,7 +265,7 @@ The leader:
 6. keeps only short string excerpts that occur verbatim in the observed source;
 7. proposes reachability, risk findings, reason, and excerpts.
 
-The hostile page is never interpolated as an instruction section. It is JSON-encoded as a data value.
+The hostile page is encoded as data rather than interpolated as an instruction section.
 
 ### Validator
 
@@ -177,11 +278,34 @@ Each validator independently:
 5. checks security-relevant risk dimensions and the derived class independently agree;
 6. uses the **same validator snapshot** for classification and excerpt grounding, avoiding a second-fetch time-of-check/time-of-use gap;
 7. requires every leader excerpt to be a canonical bounded string present in that validator snapshot;
-8. independently judges each released excerpt as passive and relevant to the caller purpose.
+8. independently judges every released excerpt as passive and relevant to the caller purpose.
 
-The validator is therefore not a JSON/schema checker. A well-formed but substantively different leader proposal is rejected.
+A validator is therefore not a JSON/schema checker. The Direct Mode suite explicitly injects forged leader payloads using `direct_vm.run_validator(leader_result=...)`.
 
 See [`docs/CONSENSUS.md`](docs/CONSENSUS.md).
+
+## Equivalence rule
+
+Validators do **not** require identical prose or identical fine-grained semantic category bits. Those can legitimately vary between independent model executions.
+
+They do require agreement on the security facts that affect downstream behavior: reachability, hard-risk presence, literal-floor presence, parser-failure presence and the derived terminal class. A well-formed leader result that says SAFE while the validator independently observes a hard-risk source is rejected.
+
+This is why strict byte/prose equality would be too brittle, while format-only validation would be too weak.
+
+## Deterministic vs nondeterministic responsibility
+
+| Deterministic contract code | Consensus-backed nondeterminism |
+|---|---|
+| URL/hostname admission | live source rendering |
+| purpose bounds/control-channel screening | semantic machine-control classification |
+| literal control-language floor | passive/relevant excerpt judgment |
+| strict risk-mask parsing | |
+| terminal status derivation | |
+| cancellation/single-resolution rules | |
+| storage/events | |
+| `is_consumable` gate | |
+
+The model reports observations. Contract code decides what those observations are allowed to become.
 
 ## Deterministic gates
 
@@ -193,7 +317,7 @@ Ingress admits only conservative public HTTPS hostname shapes. It rejects, among
 - embedded credentials;
 - explicit ports;
 - localhost, `.localhost`, `.local`, and `.internal`;
-- ordinary private/link-local/loopback IPv4 forms;
+- private/link-local/loopback IPv4 forms;
 - numeric-only legacy IP spellings;
 - leading-zero/encoded ambiguous host forms;
 - malformed DNS labels;
@@ -215,7 +339,7 @@ This is defence in depth, not a claim that contract code can replace validator-n
 - forged unknown bits are rejected;
 - truthy strings cannot impersonate booleans;
 - every released excerpt must be a canonical string anchored in the independent validator snapshot;
-- each excerpt receives an independent passive/relevance judgment.
+- every excerpt receives an independent passive/relevance judgment.
 
 ### After consensus
 
@@ -225,7 +349,21 @@ Only this path is automatically consumable:
 status == SAFE and len(excerpts) > 0
 ```
 
-A safe classification with no grounded evidence is harmless but not useful evidence.
+A safe classification with no grounded evidence is harmless but is not consumable evidence.
+
+## Fail-closed matrix
+
+| Condition | Result |
+|---|---|
+| Source cannot be read | `UNAVAILABLE` |
+| Semantic machine-control risk | `QUARANTINED` |
+| Classifier cannot be safely parsed | `QUARANTINED` |
+| Deterministic literal floor only | at least `SUSPICIOUS` |
+| SAFE classification but no grounded excerpt | `is_consumable == false` |
+| Forged/wrongly typed leader fields | validator rejects proposal |
+| Leader/validator security-class disagreement | validator rejects proposal |
+| Terminal capsule resolved again | rejected |
+| Non-requester cancellation | rejected |
 
 ## Public API
 
@@ -233,13 +371,11 @@ A safe classification with no grounded evidence is harmless but not useful evide
 
 Creates a `PENDING` evidence capsule.
 
-Example purpose:
+Example passive purpose:
 
 ```text
 Extract factual evidence about whether ACME announced version 3.0.
 ```
-
-The purpose is a bounded relevance description, not an arbitrary model prompt.
 
 ### `resolve(capsule_id)`
 
@@ -255,98 +391,67 @@ Returns the stored machine-readable capsule.
 
 ### `is_consumable(capsule_id) -> bool`
 
-The preferred downstream safety gate. Returns true only for `SAFE` plus at least one grounded excerpt.
+Preferred downstream gate. Returns true only for `SAFE` plus at least one grounded excerpt.
 
 ### `get_risk_dictionary() -> dict`
 
 Returns the fixed diagnostic risk dictionary.
 
-## Testing without `genvm-lint`
-
-## Validation results for this checkout
+## Validation results
 
 | Gate | Result | Evidence |
 |---|---|---|
 | SDK-free source preflight | PASS | `74/74` checks |
 | Python source compilation | PASS | contract and deployment/preflight scripts compile |
-| Direct Mode | PASS | `19 passed` with `genlayer-test v0.29.2`, Python 3.12.13, strict mocks, and pickling checks enabled; a temporary external Windows unlink shim was required for the harness bug |
-| GenVM linter | ENVIRONMENT BLOCKED | `genvm-linter v0.11.0` source installation did not produce an installed package/CLI in this runtime; no pass is claimed |
-| GenLayer CLI | PASS | official CLI `0.39.2` installed; Studionet selected; RPC reachable |
-| Studionet deployment | PASS | CLI `0.39.2`; finalized contract `0xd7fe4E83829E357CB192071F05Fa5416A1ae485F`; deployment tx recorded in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
+| Direct Mode | PASS | `19 passed, 0 failed, 0 skipped` with `genlayer-test v0.29.2`, Python 3.12.13, strict mocks and pickling enabled |
+| Pickling | PASS | `direct_vm.check_pickling = True` |
+| GenVM linter | ENVIRONMENT BLOCKED | v0.11.0 source installation in the verified Windows runtime did not expose a usable installed CLI; no pass is claimed |
+| GenLayer CLI | PASS | official CLI `0.39.2`; Studionet RPC reachable |
+| Studionet deployment | PASS | finalized contract and deployment transaction recorded above |
+| Live safe evidence | PASS | capsule `1`: `SAFE`, risk `0`, two grounded excerpts, consumable `true` |
+| Live hostile evidence | PASS | capsule `3`: `QUARANTINED`, risk `265`, consumable `false` |
 
-Direct Mode executed the contract successfully after an external, uncommitted Windows compatibility shim deferred the harness's unlink of an fd-0 temp file. Studionet deployment and live smoke evidence are recorded in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+Direct Mode executed the real contract after an external, uncommitted Windows compatibility shim deferred a `genlayer-test` temporary-file cleanup bug. No contract change was needed for that harness issue.
 
-The linter is **not** required to run the primary test path.
+The linter is optional and is the only remaining tooling row not green; it is **not a contract, consensus, Direct Mode or Studionet runtime failure**.
 
-### 1. Zero-dependency preflight
-
-Uses only Python's standard library and reads the exact contract source:
+### Zero-dependency preflight
 
 ```bash
 python scripts/preflight.py
 ```
 
-It checks contract structure, nondeterminism placement, absence of state writes/events inside `_inspect`, URL hardening, risk parsing, evidence anchoring, status derivation, and hostile-input prompt framing.
+The script reads the actual `contracts/ingress.py` source and checks structure, nondeterminism placement, absence of state writes/events inside `_inspect`, URL hardening, risk parsing, evidence anchoring, status derivation, hostile-input prompt framing and timestamp compatibility.
 
-### 2. Direct Mode
-
-Install only the compatible test suite:
+### Direct Mode
 
 ```bash
 pip install -r requirements-test.txt
-```
-
-Then run:
-
-```bash
 pytest tests/direct/ -v -s
 ```
 
-The Direct Mode suite covers normal state transitions and adversarial cases including:
+The suite covers normal state transitions and adversarial cases including safe grounded evidence, prompt-like purpose rejection, literal and semantic attacks, malformed/fractional/hex-like risk fields, unsupported bits, invented excerpts, forged leader payloads, non-boolean reachability, security-class disagreement, cancellation and single-resolution rules.
 
-- safe grounded evidence;
-- prompt-like purpose rejection;
-- literal and semantic attacks;
-- malformed/fractional/hex-like risk fields;
-- unsupported risk bits;
-- invented excerpts;
-- forged leader payloads;
-- non-boolean reachability;
-- leader/validator security-class disagreement;
-- cancellation and single-resolution rules.
+### Optional linter
 
-The forged-leader tests use `direct_vm.run_validator(leader_result=...)`, so they exercise the validator against a deliberately malicious proposal rather than only against malformed model output.
-
-### 3. Optional linter
-
-When the GenVM linter and its SDK artifact are available:
+When the GenVM linter is usable in the local environment:
 
 ```bash
 pip install -r requirements.txt
 genvm-lint check contracts/ingress.py
 ```
 
-A linter installation/artifact failure should not prevent the independent preflight and Direct Mode paths above from running.
+A linter installation/tooling failure does not replace the independent preflight, Direct Mode and live Studionet evidence above.
 
 ## Studionet deployment
 
-Ingress has no constructor arguments.
-
-If the GenLayer CLI already has an active/unlocked account, the repository provides:
+Ingress has no constructor arguments. For an active/unlocked GenLayer CLI account:
 
 ```bash
 python scripts/deploy_studionet.py
 ```
 
-The launcher:
-
-1. runs the zero-dependency preflight;
-2. shows the active CLI account;
-3. deploys the exact `contracts/ingress.py` file to the Studionet RPC;
-4. never accepts, reads, or stores a private key;
-5. does not invoke `genvm-lint`.
-
-Equivalent direct CLI deployment:
+Equivalent direct deployment:
 
 ```bash
 genlayer deploy \
@@ -354,25 +459,37 @@ genlayer deploy \
   --rpc https://studio.genlayer.com/api
 ```
 
-After deployment, exercise real writes and inspect any failing transaction receipt/trace before changing contract logic.
+The verified deployment and every smoke transaction are recorded in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+## Live smoke evidence
+
+| Action | Result |
+|---|---|
+| `get_risk_dictionary()` | all 10 expected entries returned |
+| Open safe inspection | capsule `1`, `PENDING` |
+| Open + cancel disposable inspection | capsule `2`, `CANCELLED` |
+| Resolve safe public source | capsule `1`, `SAFE`, risk `0`, two grounded excerpts |
+| `is_consumable(1)` | `true` |
+| Resolve hostile public fixture | capsule `3`, `QUARANTINED`, risk `265` |
+| `is_consumable(3)` | `false` |
+
+The hostile fixture is [`fixtures/hostile_evidence.txt`](fixtures/hostile_evidence.txt). Transaction hashes and receipt notes are preserved in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## Security properties
 
-Ingress is designed so that:
+**Caller text is not evidence.** The source is fetched inside the nondeterministic path.
 
-**Caller text is not evidence.** The source is fetched inside the non-deterministic path.
-
-**Hostile source text is treated as data.** Source, purpose, and excerpt validation values are JSON-framed before model reasoning.
+**Hostile source text is treated as data.** Source, purpose and excerpt validation values are JSON-framed before model reasoning.
 
 **The leader cannot invent evidence.** Released excerpts must occur in an independent validator snapshot.
 
-**Obvious control language cannot become SAFE.** A small deterministic lexical floor exists outside model judgment.
+**Obvious control language cannot become SAFE.** A deterministic lexical floor exists outside model judgment.
 
 **Malformed model fields fail closed.** Unsupported or ambiguous risk representations cannot silently coerce into a safe mask.
 
-**Forged leader fields are validated.** Unknown bits, wrong types, and security-dimension disagreement reject the proposal.
+**Forged leader fields are validated.** Unknown bits, wrong types and security-dimension disagreement reject the proposal.
 
-**The model does not directly settle state.** Ordinary code derives terminal status and the consumption gate.
+**The model does not directly settle state.** Deterministic code derives terminal status and the consumption gate.
 
 **There is no privileged bypass.** No administrator can rewrite a terminal capsule or turn quarantined evidence safe.
 
@@ -407,11 +524,76 @@ untrusted live source
 truth / corroboration / policy / settlement primitive
 ```
 
+For example, a corroboration primitive can refuse to consider a source unless `Ingress.is_consumable(capsule_id)` returns true, then independently decide whether the released factual evidence is corroborated or authoritative.
+
 See [`docs/INTEGRATION.md`](docs/INTEGRATION.md).
+
+## Repository layout
+
+```text
+.
+├── contracts/
+│   └── ingress.py
+├── tests/
+│   └── direct/
+│       ├── test_ingress.py
+│       └── test_ingress_hardening.py
+├── scripts/
+│   ├── preflight.py
+│   └── deploy_studionet.py
+├── fixtures/
+│   └── hostile_evidence.txt
+├── docs/
+│   ├── CONSENSUS.md
+│   ├── SECURITY.md
+│   ├── INTEGRATION.md
+│   └── DEPLOYMENT.md
+├── requirements-test.txt
+├── requirements.txt
+├── gltest.config.yaml
+├── SUBMISSION.md
+├── LICENSE
+└── README.md
+```
+
+### Important files
+
+| File | Purpose |
+|---|---|
+| [`contracts/ingress.py`](contracts/ingress.py) | canonical deployable Intelligent Contract |
+| [`tests/direct/test_ingress.py`](tests/direct/test_ingress.py) | state, consensus and normal security behavior |
+| [`tests/direct/test_ingress_hardening.py`](tests/direct/test_ingress_hardening.py) | forged-leader and malformed-output adversarial coverage |
+| [`scripts/preflight.py`](scripts/preflight.py) | zero-dependency source/security gate |
+| [`docs/CONSENSUS.md`](docs/CONSENSUS.md) | custom validator and equivalence design |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | threat model, guarantees and limitations |
+| [`docs/INTEGRATION.md`](docs/INTEGRATION.md) | stable downstream composition surface |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | real Studionet address, transactions and smoke evidence |
+| [`SUBMISSION.md`](SUBMISSION.md) | copy-ready reviewer/submission summary |
+
+## Reviewer fast path
+
+If you have five minutes:
+
+1. Read the contract thesis and live deployment table at the top of this README.
+2. Inspect [`contracts/ingress.py`](contracts/ingress.py), especially `_inspect`, the custom validator, terminal status derivation and `is_consumable`.
+3. Inspect the forged-leader tests in [`tests/direct/test_ingress_hardening.py`](tests/direct/test_ingress_hardening.py).
+4. Read [`docs/CONSENSUS.md`](docs/CONSENSUS.md) for what must agree and what may vary.
+5. Read [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for real safe and hostile Studionet transactions.
+6. Read [`docs/SECURITY.md`](docs/SECURITY.md) for explicit non-guarantees.
+
+## Builder submission
+
+**Category:** Standalone GenLayer Intelligent Contract  
+**Primitive:** Ingress  
+**Purpose:** consensus-backed hostile-web-evidence intake  
+**Repository:** `https://github.com/ometere123/ingress`  
+**Studionet contract:** `0xd7fe4E83829E357CB192071F05Fa5416A1ae485F`
+
+Copy-ready submission notes are in [`SUBMISSION.md`](SUBMISSION.md).
 
 ## Repository philosophy
 
-One deployable contract, explicit consensus reasoning, fail-closed state transitions, adversarial tests, no frontend, no CI, and no application-specific product flow.
+One deployable contract, explicit consensus reasoning, fail-closed state transitions, adversarial tests, real runtime evidence, no frontend, no CI and no application-specific product flow.
 
 That is the primitive boundary.
 

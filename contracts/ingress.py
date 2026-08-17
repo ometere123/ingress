@@ -364,7 +364,7 @@ CALLER_PURPOSE_JSON
 RISK BITS
 1   PROMPT_OVERRIDE: tells the reader to ignore, replace, or override governing instructions
 2   ROLE_IMPERSONATION: claims system/developer/assistant authority over the reader
-4   TASK_REDIRECTION: redirects the evidence task
+4   TASK_REDIRECTION: redirects the reader away from the evidence task
 8   SECRET_EXFILTRATION: asks for hidden prompts, credentials, secrets, keys, private context
 16  TOOL_OR_ACTION_COMMAND: asks the reader to execute code, call tools, transact, message, download, or otherwise act
 32  OBFUSCATED_INSTRUCTION: encoded/disguised machine-directed instruction intended to evade detection
@@ -500,6 +500,7 @@ class Ingress(gl.Contract):
             except Exception:
                 return False
 
+            # Reachability is a typed decision field, not Python truthiness.
             leader_reachable = leader.get("reachable")
             own_reachable = own.get("reachable")
             if not isinstance(leader_reachable, bool) or not isinstance(own_reachable, bool):
@@ -517,6 +518,10 @@ class Ingress(gl.Contract):
                 if mask < 0 or mask & ~ALLOWED_RISK_MASK:
                     return False
 
+            # Compare consensus-relevant security dimensions. Exact semantic
+            # category bits are diagnostic because models can label the same
+            # attack differently, but coarse risk presence and terminal class
+            # must independently agree.
             if bool(leader_mask & SEMANTIC_RISK_MASK) != bool(own_mask & SEMANTIC_RISK_MASK):
                 return False
             if bool(leader_mask & RISK_LITERAL_CONTROL_PHRASE) != bool(
@@ -530,6 +535,8 @@ class Ingress(gl.Contract):
             if risk_class(leader_mask) != risk_class(own_mask):
                 return False
 
+            # Classification and excerpt grounding use the same validator
+            # snapshot, avoiding a second-fetch time-of-check/time-of-use gap.
             validator_page = own.get("source_text")
             if not isinstance(validator_page, str) or validator_page == "":
                 return False
@@ -617,6 +624,8 @@ class Ingress(gl.Contract):
         if not isinstance(excerpts, list):
             excerpts = []
 
+        # A SAFE capsule with no grounded evidence is harmless but useless. It
+        # remains SAFE as a source-security result; is_consumable stays false.
         capsule.status = u8(status)
         capsule.risk_mask = u32(mask)
         capsule.reason = clean_text(result.get("reason", ""), MAX_REASON_LEN)

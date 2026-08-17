@@ -500,7 +500,7 @@ class Ingress(gl.Contract):
         capsule.status = u8(STATUS_PENDING)
         capsule.risk_mask = u32(0)
         capsule.reason = ""
-        capsule.created_at = current_datetime()
+        capsule.created_at = gl.message_raw["datetime"]
         capsule.resolved_at = ""
 
         InspectionOpened(
@@ -523,7 +523,7 @@ class Ingress(gl.Contract):
             capsule.status = u8(STATUS_UNAVAILABLE)
             capsule.risk_mask = u32(0)
             capsule.reason = clean_text(result.get("reason", "source unavailable"), MAX_REASON_LEN)
-            capsule.resolved_at = current_datetime()
+            capsule.resolved_at = gl.message_raw["datetime"]
             InspectionResolved(capsule_id, u8(STATUS_UNAVAILABLE), risk_mask=0).emit()
             return
 
@@ -541,7 +541,7 @@ class Ingress(gl.Contract):
         capsule.status = u8(status)
         capsule.risk_mask = u32(mask)
         capsule.reason = clean_text(result.get("reason", ""), MAX_REASON_LEN)
-        capsule.resolved_at = current_datetime()
+        capsule.resolved_at = gl.message_raw["datetime"]
         for excerpt in excerpts[:MAX_EXCERPTS]:
             value = clean_text(excerpt, MAX_EXCERPT_LEN)
             if value != "":
@@ -562,7 +562,7 @@ class Ingress(gl.Contract):
         if capsule.requester != gl.message.sender_address:
             raise gl.vm.UserError(f"{ERR_EXPECTED}: only requester may cancel")
         capsule.status = u8(STATUS_CANCELLED)
-        capsule.resolved_at = current_datetime()
+        capsule.resolved_at = gl.message_raw["datetime"]
         InspectionCancelled(capsule_id, gl.message.sender_address).emit()
 
     @gl.public.view

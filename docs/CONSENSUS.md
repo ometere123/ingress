@@ -4,15 +4,15 @@ Ingress uses GenLayer consensus as a security boundary, not as decoration around
 
 ## What is non-deterministic
 
-Only operations that cannot be reproduced by ordinary deterministic contract code enter the non-deterministic path:
+Only operations that ordinary deterministic contract code cannot reproduce enter the non-deterministic path:
 
-1. reading the live web source;
+1. rendering the live web source;
 2. semantically classifying whether the source attempts to control an AI/agent reader;
-3. determining whether a proposed excerpt is passive evidence relevant to the declared purpose.
+3. judging whether a proposed excerpt is passive evidence relevant to the declared purpose.
 
-Everything else is deterministic: URL admission, lexical tripwire, risk-bit bounds, final status derivation, terminal-state enforcement, storage, and the `is_consumable` gate.
+Everything else is deterministic: URL admission, the literal tripwire, field bounds, final status derivation, terminal-state enforcement, storage, events, and `is_consumable`.
 
-## Leader result
+## Leader proposal
 
 The leader returns a bounded object:
 
@@ -25,93 +25,126 @@ The leader returns a bounded object:
 }
 ```
 
-The leader does not return a final `SAFE` or `QUARANTINED` status. Contract code derives status from `risk_mask`.
+The leader never returns a settlement status. Contract code derives `SAFE`, `SUSPICIOUS`, or `QUARANTINED` from risk findings.
+
+The classifier receives the caller purpose and hostile page as JSON-encoded data values and is asked for structured JSON output.
 
 ## Why `run_nondet_unsafe`
 
-Ingress uses `gl.vm.run_nondet_unsafe(leader_fn, validator_fn)` because the result is a classification with source-grounded evidence, not a value that should be exact-string matched.
+Ingress uses:
 
-The validator receives `leader_result`, requires `gl.vm.Return`, then independently performs the task again.
+```python
+gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+```
+
+because the output is a semantic classification plus source-grounded evidence. Exact prose equality would be brittle, while checking only response shape would be unsafe.
+
+The custom validator therefore re-executes the load-bearing work independently and explicitly defines what must be equivalent.
 
 ## Validator algorithm
 
-For each proposal a validator:
+For each leader proposal, a validator:
 
-1. independently renders the same URL;
-2. independently executes the security classifier;
-3. compares reachability;
-4. derives the leader security class and validator security class using deterministic `risk_class(...)`;
-5. rejects any class disagreement;
-6. enforces the deterministic lexical-risk floor;
-7. independently renders the source for evidence anchoring;
-8. rejects any proposed excerpt that is not present in its own observed source;
-9. independently judges each excerpt as passive/relevant evidence.
+1. requires a `gl.vm.Return` result with dictionary calldata;
+2. independently renders the admitted URL;
+3. independently classifies that source snapshot;
+4. requires leader and validator reachability fields to be actual booleans;
+5. requires leader and validator risk masks to be bounded integers with no unknown bits;
+6. rejects reachability disagreement;
+7. compares the security-relevant risk dimensions;
+8. derives and compares the terminal security class;
+9. uses the **same independently rendered validator snapshot** to ground leader excerpts;
+10. requires each excerpt to be a bounded canonical string present in that snapshot;
+11. independently judges every released excerpt as passive and relevant.
 
-Only then does it return `True`.
+Only then does the validator return `True`.
 
 ## Equivalence rule
 
-The contract deliberately does not require identical reasoning prose or an identical set of semantic risk bits when those bits map to the same fail-closed security class.
+Exact semantic risk-category bits are useful diagnostics, but they are not the consensus settlement surface.
 
-The security decision is:
+Two honest models can identify the same hard attack differently. For example, one may label text as `TASK_REDIRECTION` while another labels it `PROMPT_OVERRIDE`. Requiring exact category equality would reduce convergence without changing the safe outcome: both indicate semantic machine-control risk and both must quarantine the source.
+
+Validators therefore require agreement on:
+
+- **reachability**;
+- **semantic hard-risk presence**: any of bits `1..128` versus none;
+- **deterministic literal-floor presence**: bit `256`;
+- **analysis-failure presence**: bit `512`;
+- **derived terminal security class**;
+- **source anchoring and passive/relevance of every released excerpt**.
+
+This means a `SAFE` leader cannot be accepted by a validator that independently detects a semantic attack, literal floor, or unsafe parse failure.
+
+## Why exact category bits are diagnostic
+
+The stored `risk_mask` preserves the accepted leader's diagnostic taxonomy for inspection and debugging. Downstream automatic logic should not branch on one exact semantic category bit.
+
+The stable integration API is:
+
+```python
+ingress.is_consumable(capsule_id)
+```
+
+or equivalently the derived `status` plus evidence count.
+
+## Same-snapshot evidence verification
+
+The validator does **not** classify one page fetch and then fetch again to ground excerpts.
+
+Its independent `inspect_once(include_source=True)` returns both classification findings and the exact bounded source snapshot used for that classification. Evidence anchoring then uses that same snapshot.
+
+This removes an avoidable time-of-check/time-of-use window on fast-changing pages and saves one redundant web render per validator.
+
+## Forged leader resistance
+
+A custom validator must assume the leader payload itself can be malicious.
+
+Ingress therefore rejects, before semantic comparison:
+
+- non-boolean reachability values such as the string `"true"`;
+- boolean values used as integer masks;
+- negative masks;
+- masks containing unknown bits;
+- non-list excerpt fields;
+- non-string excerpts;
+- oversized or non-canonical excerpts;
+- excerpts absent from the validator's source snapshot.
+
+This is tested with `direct_vm.run_validator(leader_result=...)`, which supplies deliberately forged leader payloads directly to the captured validator.
+
+## Deterministic status derivation
+
+The model does not decide the state transition.
 
 ```text
-SAFE          mask == 0
-SUSPICIOUS    literal deterministic tripwire only
-QUARANTINED   semantic-risk or unparseable-analysis bit present
+semantic hard risk present   -> QUARANTINED
+analysis parse failure       -> QUARANTINED
+literal floor only           -> SUSPICIOUS
+no risk dimension            -> SAFE
+source unavailable           -> UNAVAILABLE
 ```
 
-This gives validators room to describe or categorise the same attack slightly differently without allowing a SAFE/unsafe disagreement through consensus.
+A `SAFE` capsule with no grounded excerpt is still not consumable.
 
-The important equivalence properties are:
+## Why the deterministic lexical floor exists
 
-- same reachability;
-- same derived security class;
-- deterministic literal-risk floor preserved;
-- every released excerpt independently source-anchored;
-- every released excerpt independently judged passive and relevant.
+LLMs are probabilistic. A source containing an unmistakable literal phrase such as `ignore previous instructions` should not become `SAFE` merely because a model misses it.
 
-## Why the model cannot directly decide settlement
-
-The model proposes `risk_mask` and excerpts. It cannot write state.
-
-After consensus, deterministic contract code computes:
-
-```python
-status = risk_class(mask)
-```
-
-A semantic-risk bit always produces `QUARANTINED`. A parsing failure sets `UNPARSABLE_ANALYSIS`, which also produces `QUARANTINED`. A literal tripwire cannot produce `SAFE`.
-
-Downstream consumption is even narrower:
-
-```python
-status == SAFE and len(excerpts) > 0
-```
-
-Therefore a safe classification without any grounded evidence cannot accidentally become useful evidence.
-
-## Why there is a deterministic lexical floor
-
-LLMs are probabilistic. A source containing an obvious phrase such as `ignore previous instructions` should not become `SAFE` merely because one model misses the attack.
-
-The lexical tripwire is intentionally small. It is not marketed as a complete detector. Its job is only to create a deterministic minimum floor for a handful of unmistakable control phrases.
-
-The semantic classifier remains necessary for attacks that are indirect, paraphrased, contextual, encoded, or otherwise not reducible to substring matching.
+The lexical floor is intentionally small. It is not a complete injection detector. Its purpose is to guarantee a deterministic minimum for a handful of obvious control phrases while semantic consensus handles indirect, paraphrased, contextual, or obfuscated attacks.
 
 ## Consensus failure is safer than forced resolution
 
-If validators cannot agree on the source's security class, GenLayer does not give Ingress permission to write a terminal accepted result from that proposal.
+If leader and validators cannot agree on the security-relevant dimensions, Ingress does not force a safety result from that proposal.
 
-That is preferable to forcing the primitive to choose a safety label under disagreement.
+That is preferable to writing a consumable capsule under unresolved disagreement.
 
 ## Direct proof in tests
 
-`tests/direct/test_ingress.py` includes a validator-disagreement test:
+The Direct Mode suite proves substantive validation in two ways.
 
-1. the leader sees a source and proposes `SAFE`;
-2. the test swaps the validator's LLM mock to return a machine-action risk;
-3. `direct_vm.run_validator()` executes the captured validator;
-4. validation returns `False`.
+`test_validator_reclassifies_source_and_rejects_security_class_disagreement` keeps the leader proposal well-formed but changes the validator's independent classification from safe to semantic-risk. The validator returns `False`.
 
-The leader JSON remains well-formed throughout. The only thing that changed is the validator's independently derived security class. This demonstrates that the validator is checking the claim itself, not the response format.
+`tests/direct/test_ingress_hardening.py` also injects forged leader payloads directly with `run_validator(leader_result=...)`, including unknown risk bits, non-boolean reachability, and boolean risk masks. Each must be rejected.
+
+Those tests distinguish Ingress from a format-only validator.

@@ -94,8 +94,10 @@ def source_checks(source: str, tree: ast.Module) -> int:
             name = dotted(node.func)
             if name.startswith("gl.nondet."):
                 nondet += 1
-                check("_inspect" in parents[id(node)],
-                      f"{name} outside _inspect at line {node.lineno}")
+                check(
+                    "_inspect" in parents[id(node)] or "inspect_once" in parents[id(node)],
+                    f"{name} outside the Ingress inspection path at line {node.lineno}",
+                )
             if name == "gl.vm.run_nondet_unsafe":
                 unsafe += 1
             if isinstance(node.func, ast.Attribute) and node.func.attr == "emit":

@@ -415,6 +415,60 @@ or is unrelated to the purpose.
 # ---------------------------------------------------------------------------
 
 
+def inspect_once(url: str, purpose: str, include_source: bool = False) -> dict:
+    """Fetch and classify one independent source observation."""
+    try:
+        page = gl.nondet.web.render(url, mode="text")
+        source = str(page)[:MAX_PAGE_CHARS]
+    except Exception:
+        return {
+            "reachable": False,
+            "risk_mask": 0,
+            "reason": "source unavailable",
+            "excerpts": [],
+        }
+
+    if len(source.strip()) == 0:
+        return {
+            "reachable": False,
+            "risk_mask": 0,
+            "reason": "source returned no readable text",
+            "excerpts": [],
+        }
+
+    floor = lexical_risk_mask(source)
+    try:
+        raw = gl.nondet.exec_prompt(
+            analysis_prompt(source, purpose),
+            response_format="json",
+        )
+        parsed = parse_json_object(raw)
+        semantic = strict_risk_mask(parsed.get("risk_mask", 0))
+        reason = clean_text(parsed.get("reason", ""), MAX_REASON_LEN)
+        excerpts = normalise_excerpts(parsed.get("excerpts", []), source)
+    except Exception as exc:
+        result = {
+            "reachable": True,
+            "risk_mask": floor | RISK_UNPARSABLE_ANALYSIS,
+            "reason": clean_text(f"analysis failed: {exc}", MAX_REASON_LEN),
+            "excerpts": [],
+        }
+        if include_source:
+            result["source_text"] = source
+        return result
+
+    mask = semantic | floor
+    result = {
+        "reachable": True,
+        "risk_mask": mask,
+        "reason": reason,
+        "excerpts": excerpts,
+    }
+    if include_source:
+        result["source_text"] = source
+    return result
+
+
 class Ingress(gl.Contract):
     """Consensus firewall for untrusted web evidence."""
 
@@ -433,60 +487,8 @@ class Ingress(gl.Contract):
     def _inspect(self, url: str, purpose: str) -> dict:
         """Leader proposes a bounded security capsule; validators re-derive it."""
 
-        def inspect_once(include_source: bool = False) -> dict:
-            try:
-                page = gl.nondet.web.render(url, mode="text")
-                source = str(page)[:MAX_PAGE_CHARS]
-            except Exception:
-                return {
-                    "reachable": False,
-                    "risk_mask": 0,
-                    "reason": "source unavailable",
-                    "excerpts": [],
-                }
-
-            if len(source.strip()) == 0:
-                return {
-                    "reachable": False,
-                    "risk_mask": 0,
-                    "reason": "source returned no readable text",
-                    "excerpts": [],
-                }
-
-            floor = lexical_risk_mask(source)
-            try:
-                raw = gl.nondet.exec_prompt(
-                    analysis_prompt(source, purpose),
-                    response_format="json",
-                )
-                parsed = parse_json_object(raw)
-                semantic = strict_risk_mask(parsed.get("risk_mask", 0))
-                reason = clean_text(parsed.get("reason", ""), MAX_REASON_LEN)
-                excerpts = normalise_excerpts(parsed.get("excerpts", []), source)
-            except Exception as exc:
-                result = {
-                    "reachable": True,
-                    "risk_mask": floor | RISK_UNPARSABLE_ANALYSIS,
-                    "reason": clean_text(f"analysis failed: {exc}", MAX_REASON_LEN),
-                    "excerpts": [],
-                }
-                if include_source:
-                    result["source_text"] = source
-                return result
-
-            mask = semantic | floor
-            result = {
-                "reachable": True,
-                "risk_mask": mask,
-                "reason": reason,
-                "excerpts": excerpts,
-            }
-            if include_source:
-                result["source_text"] = source
-            return result
-
         def leader_fn() -> dict:
-            return inspect_once(False)
+            return inspect_once(url, purpose, False)
 
         def validator_fn(leader_result) -> bool:
             if not isinstance(leader_result, gl.vm.Return):
@@ -496,7 +498,7 @@ class Ingress(gl.Contract):
                 return False
 
             try:
-                own = inspect_once(True)
+                own = inspect_once(url, purpose, True)
             except Exception:
                 return False
 
@@ -625,14 +627,15 @@ class Ingress(gl.Contract):
             return
 
         raw_mask = result.get("risk_mask", RISK_UNPARSABLE_ANALYSIS)
-        try:
-            if isinstance(raw_mask, bool) or not isinstance(raw_mask, int):
-                raise ValueError("consensus returned malformed risk mask")
-            if raw_mask < 0 or raw_mask & ~ALLOWED_RISK_MASK:
-                raise ValueError("consensus returned unsupported risk bits")
-            mask = raw_mask
-        except Exception:
+        if (
+            isinstance(raw_mask, bool)
+            or not isinstance(raw_mask, int)
+            or raw_mask < 0
+            or raw_mask & ~ALLOWED_RISK_MASK
+        ):
             mask = RISK_UNPARSABLE_ANALYSIS
+        else:
+            mask = raw_mask
         status = risk_class(mask)
         excerpts = result.get("excerpts", [])
         if not isinstance(excerpts, list):

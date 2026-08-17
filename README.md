@@ -406,6 +406,7 @@ Returns the fixed diagnostic risk dictionary.
 | Direct Mode | PASS | `19 passed, 0 failed, 0 skipped` with `genlayer-test v0.29.2`, Python 3.12.13, strict mocks and pickling enabled |
 | Pickling | PASS | `direct_vm.check_pickling = True` |
 | GenVM linter | PASS | `genvm-lint check contracts/ingress.py --json`, genvm-linter `0.11.0`, exit `0` |
+| Studionet integration | PASS | `4 passed` via `pytest tests/integration/ -v -s --network studionet` |
 | GenLayer CLI | PASS | official CLI `0.39.2`; Studionet RPC reachable |
 | Studionet deployment | PASS | finalized contract and deployment transaction recorded above |
 | Live safe evidence | PASS | capsule `1`: `SAFE`, risk `0`, grounded excerpt, consumable `true` |
@@ -432,7 +433,7 @@ pytest tests/direct/ -v -s
 
 The suite covers normal state transitions and adversarial cases including safe grounded evidence, prompt-like purpose rejection, literal and semantic attacks, malformed/fractional/hex-like risk fields, unsupported bits, invented excerpts, forged leader payloads, non-boolean reachability, security-class disagreement, cancellation and single-resolution rules.
 
-### Optional linter
+### GenVM linter
 
 When the GenVM linter is usable in the local environment:
 
@@ -441,7 +442,17 @@ pip install -r requirements.txt
 genvm-lint check contracts/ingress.py
 ```
 
-A linter installation/tooling failure does not replace the independent preflight, Direct Mode and live Studionet evidence above.
+The committed linter dependency is the published `genvm-linter==0.11.0` package. The primary check reports both AST linting and SDK validation success.
+
+### Studionet integration
+
+The committed integration suite deploys the current contract through official Studio Mode and exercises real validator consensus, safe evidence, hostile evidence, and cancellation:
+
+```bash
+pytest tests/integration/ -v -s --network studionet
+```
+
+The suite completed with `4 passed` in the verified environment.
 
 ## Studionet deployment
 

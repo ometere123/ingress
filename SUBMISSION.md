@@ -13,10 +13,11 @@ Ingress is a reusable consensus firewall that screens untrusted live web content
 ## Repository and live evidence
 
 - Repository: `https://github.com/ometere123/ingress`
-- Studionet contract: `0xd7fe4E83829E357CB192071F05Fa5416A1ae485F`
-- Deployment transaction: `0xa9091bd32f5f3b5d5de3c17ce1b04c3545cd1d46df79dbdfbf02acd48bc2605b`
-- Deployment state: `FINALIZED`, `MAJORITY_AGREE`
-- Deployment source commit: `75a965eaa8760c26fe86fa8918c690ca150702ae`
+- Studionet contract: `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5`
+- Deployment transaction: `0x277e11d40d3247b423017b12d47be884ccf5630a4bd6eb45942a184969f1dc72`
+- Deployment state: `ACCEPTED`, `MAJORITY_AGREE`
+- Deployment source commit: `594d324`
+- Deployment method: official genlayer-test Studio Mode
 - Full deployment/smoke evidence: `docs/DEPLOYMENT.md`
 
 `contracts/ingress.py` has not changed since the deployment source commit. Later commits add the public hostile fixture and reviewer/deployment documentation only.
@@ -117,11 +118,11 @@ The model reports observations. Deterministic contract code decides what those o
 | Studionet deployment | **PASS**, finalized |
 | Safe live source | **PASS**, `SAFE`, risk `0`, two grounded excerpts, consumable `true` |
 | Hostile live fixture | **PASS**, `QUARANTINED`, risk `265`, consumable `false` |
-| GenVM linter | **environment/tooling blocked**; no pass is claimed |
+| GenVM linter | **PASS**, published `genvm-linter==0.11.0`, `check --json` exit `0` |
 
 The Direct Mode Windows harness required an external, uncommitted temporary-file cleanup shim. No contract change was required to obtain the 19/19 result.
 
-The optional linter row is the only tooling row not green and is not a contract, consensus, Direct Mode, pickling, deployment, or live-runtime failure.
+The primary GenVM linter gate is green; its only output warning was informational `I200` about a newer runner.
 
 ## Live runtime proof reviewers should notice
 

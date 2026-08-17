@@ -1,7 +1,7 @@
 # Ingress Studionet Deployment
 
 Source commit:
-`75a965eaa8760c26fe86fa8918c690ca150702ae`
+`594d324` (full commit: `594d324`)
 
 Date:
 2026-08-17
@@ -13,25 +13,27 @@ RPC:
 `https://studio.genlayer.com/api`
 
 Deployment method:
-GenLayer CLI `0.39.2`
+official genlayer-test Studio Mode (`genlayer-test 0.29.2`, Python `3.12.13`)
 
 Deployer:
-`0x494e6F2370e481e51284C1A8DC5649A7fA50e8a6`
+`0x62eBa06A7fCbba23271EeFcAe1EebE99B45EADc3`
 
 Contract:
-`0xd7fe4E83829E357CB192071F05Fa5416A1ae485F`
+`0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5`
 
 Deployment transaction:
-`0xa9091bd32f5f3b5d5de3c17ce1b04c3545cd1d46df79dbdfbf02acd48bc2605b`
+`0x277e11d40d3247b423017b12d47be884ccf5630a4bd6eb45942a184969f1dc72`
 
 Status:
 `FINALIZED`, `MAJORITY_AGREE`
 
 ## Source parity
 
-The deployed source is commit `75a965eaa8760c26fe86fa8918c690ca150702ae`.
+The deployed source is commit `594d324`.
 
-`contracts/ingress.py` has not changed after that deployment source commit. Subsequent repository commits add the hostile evidence fixture and reviewer/deployment documentation only, so the deployable contract on current `main` remains byte-identical to the contract that was deployed and smoke-tested below.
+`contracts/ingress.py` has not changed after that deployment source commit. Subsequent repository commits add reviewer/deployment documentation only.
+
+The detailed safe/hostile smoke transactions below were executed against an earlier deployment of the same byte-identical contract source; the fresh Studio Mode deployment above reached `ACCEPTED` / `MAJORITY_AGREE`.
 
 ## Runtime verification
 

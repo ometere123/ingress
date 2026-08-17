@@ -33,11 +33,11 @@ Only a `SAFE` capsule with at least one validator-grounded excerpt returns `is_c
 | Evidence | Value |
 |---|---|
 | Network | Studionet |
-| Contract | `0xd7fe4E83829E357CB192071F05Fa5416A1ae485F` |
-| Deployment tx | `0xa9091bd32f5f3b5d5de3c17ce1b04c3545cd1d46df79dbdfbf02acd48bc2605b` |
-| Deployment state | `FINALIZED`, `MAJORITY_AGREE` |
-| Deployment source | `75a965eaa8760c26fe86fa8918c690ca150702ae` |
-| CLI | GenLayer CLI `0.39.2` |
+| Contract | `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5` |
+| Deployment tx | `0x277e11d40d3247b423017b12d47be884ccf5630a4bd6eb45942a184969f1dc72` |
+| Deployment state | `ACCEPTED`, `MAJORITY_AGREE` |
+| Deployment source | `594d324` |
+| Deployment method | official genlayer-test Studio Mode |
 
 The deployable `contracts/ingress.py` on current `main` is unchanged from the deployed source commit. Later commits add the hostile public fixture and documentation/evidence only. Full transaction evidence is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
@@ -405,7 +405,7 @@ Returns the fixed diagnostic risk dictionary.
 | Python source compilation | PASS | contract and deployment/preflight scripts compile |
 | Direct Mode | PASS | `19 passed, 0 failed, 0 skipped` with `genlayer-test v0.29.2`, Python 3.12.13, strict mocks and pickling enabled |
 | Pickling | PASS | `direct_vm.check_pickling = True` |
-| GenVM linter | ENVIRONMENT BLOCKED | v0.11.0 source installation in the verified Windows runtime did not expose a usable installed CLI; no pass is claimed |
+| GenVM linter | PASS | `genvm-lint check contracts/ingress.py --json`, genvm-linter `0.11.0`, exit `0` |
 | GenLayer CLI | PASS | official CLI `0.39.2`; Studionet RPC reachable |
 | Studionet deployment | PASS | finalized contract and deployment transaction recorded above |
 | Live safe evidence | PASS | capsule `1`: `SAFE`, risk `0`, two grounded excerpts, consumable `true` |
@@ -413,7 +413,7 @@ Returns the fixed diagnostic risk dictionary.
 
 Direct Mode executed the real contract after an external, uncommitted Windows compatibility shim deferred a `genlayer-test` temporary-file cleanup bug. No contract change was needed for that harness issue.
 
-The linter is optional and is the only remaining tooling row not green; it is **not a contract, consensus, Direct Mode or Studionet runtime failure**.
+The primary GenVM linter gate is green. Its JSON check reported `lint.ok=true` and `validate.ok=true`; only informational warning `I200` noted that a newer runner is available.
 
 ### Zero-dependency preflight
 
@@ -587,7 +587,7 @@ If you have five minutes:
 **Primitive:** Ingress  
 **Purpose:** consensus-backed hostile-web-evidence intake  
 **Repository:** `https://github.com/ometere123/ingress`  
-**Studionet contract:** `0xd7fe4E83829E357CB192071F05Fa5416A1ae485F`
+**Studionet contract:** `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5`
 
 Copy-ready submission notes are in [`SUBMISSION.md`](SUBMISSION.md).
 

@@ -61,7 +61,7 @@ def test_open_inspection_stores_pending_capsule(direct_vm, direct_deploy):
     assert capsule["consumable"] is False
 
 
-def test_url_gate_rejects_non_https_and_obvious_private_targets(direct_vm, direct_deploy):
+def test_url_gate_rejects_non_https_private_and_ambiguous_targets(direct_vm, direct_deploy):
     contract = direct_deploy(CONTRACT)
 
     for bad in (
@@ -74,9 +74,35 @@ def test_url_gate_rejects_non_https_and_obvious_private_targets(direct_vm, direc
         "https://service.internal/private",
         "https://user:pass@example.com/private",
         "https://example.com:8443/private",
+        # Legacy and obfuscated IP spellings that browsers/resolvers may
+        # interpret differently from a naive dotted-quad parser.
+        "https://127.1/admin",
+        "https://2130706433/admin",
+        "https://0177.0.0.1/admin",
+        "https://0x7f000001/admin",
+        "https://%31%32%37.0.0.1/admin",
+        # DNS-wrapper shapes beginning with a private IPv4 address.
+        "https://127.0.0.1.nip.io/admin",
+        "https://10.0.0.1.nip.io/admin",
+        # Ambiguous or malformed DNS labels.
+        "https://foo..example.com/private",
+        "https://-bad.example.com/private",
+        "https://bad-.example.com/private",
     ):
         with direct_vm.expect_revert("EXPECTED"):
             contract.open_inspection(bad, PURPOSE)
+
+
+def test_url_gate_accepts_normal_public_dns_names(direct_vm, direct_deploy):
+    contract = direct_deploy(CONTRACT)
+
+    for good in (
+        "https://example.com/release",
+        "https://docs.example.com/release",
+        "https://xn--bcher-kva.example/release",
+    ):
+        capsule_id = contract.open_inspection(good, PURPOSE)
+        assert contract.get_capsule(capsule_id)["url"] == good
 
 
 def test_purpose_cannot_be_a_second_prompt_channel(direct_vm, direct_deploy):

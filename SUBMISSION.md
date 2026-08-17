@@ -20,7 +20,7 @@ Ingress is a reusable consensus firewall that screens untrusted live web content
 - Deployment method: official genlayer-test Studio Mode
 - Full deployment/smoke evidence: `docs/DEPLOYMENT.md`
 
-`contracts/ingress.py` has not changed since the deployment source commit. Later commits add the public hostile fixture and reviewer/deployment documentation only.
+`contracts/ingress.py` has not changed since the deployment source commit. Subsequent commits affect only tests, tooling dependencies, fixtures and documentation; the deployable contract source remains identical.
 
 ## The problem
 
@@ -114,6 +114,7 @@ The model reports observations. Deterministic contract code decides what those o
 | Python source compilation | **PASS** |
 | Direct Mode | **PASS, 19 passed / 0 failed / 0 skipped** |
 | Pickling | **PASS**, `check_pickling=True` |
+| Studionet integration | **PASS, 4 passed / 0 failed / 0 skipped** |
 | GenLayer CLI | **PASS**, `0.39.2` |
 | Studionet deployment | **PASS**, finalized |
 | Safe live source | **PASS**, resolve `0x47703a64c766f1955452b8863cd0988982e04008c310df939737e8459ee095ea`, `SAFE`, risk `0`, grounded excerpt, consumable `true` |
@@ -123,6 +124,8 @@ The model reports observations. Deterministic contract code decides what those o
 The Direct Mode Windows harness required an external, uncommitted temporary-file cleanup shim. No contract change was required to obtain the 19/19 result.
 
 The primary GenVM linter gate is green; its only output warning was informational `I200` about a newer runner.
+
+The committed Studionet integration suite independently redeploys Ingress through official Studio Mode and verifies the public read surface, SAFE consumable evidence, hostile non-consumable evidence and cancellation. Each behavioural test uses a fresh disposable deployment so it can be run independently without relying on pytest ordering.
 
 ## Live runtime proof reviewers should notice
 
@@ -166,6 +169,7 @@ truth / corroboration / policy / settlement
 python scripts/preflight.py
 pip install -r requirements-test.txt
 pytest tests/direct/ -v -s
+pytest tests/integration/ -v -s --network studionet
 ```
 
 For a configured/unlocked GenLayer CLI account:
@@ -181,11 +185,12 @@ The deploy helper does not accept a private key and does not invoke `genvm-lint`
 1. `contracts/ingress.py`
 2. `tests/direct/test_ingress_hardening.py`
 3. `tests/direct/test_ingress.py`
-4. `docs/CONSENSUS.md`
-5. `docs/DEPLOYMENT.md`
-6. `docs/SECURITY.md`
-7. `scripts/preflight.py`
-8. `docs/INTEGRATION.md`
+4. `tests/integration/test_ingress_studionet.py`
+5. `docs/CONSENSUS.md`
+6. `docs/DEPLOYMENT.md`
+7. `docs/SECURITY.md`
+8. `scripts/preflight.py`
+9. `docs/INTEGRATION.md`
 
 ## Scope honesty
 

@@ -33,15 +33,19 @@ Only a `SAFE` capsule with at least one validator-grounded excerpt returns `is_c
 | Evidence | Value |
 |---|---|
 | Network | Studionet |
-| Contract | `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5` |
-| Deployment tx | `0x277e11d40d3247b423017b12d47be884ccf5630a4bd6eb45942a184969f1dc72` |
+| Contract | `0xdd641B5bdBE8D9C14783b458425da180946Fe41c` |
+| Deployment tx | `0x4e3dda328e0bfc325e45497944fd9c71b7ed898bc92571eba4bf0d12283b3b70` |
 | Deployment state | `FINALIZED`, `MAJORITY_AGREE` |
-| Deployment source | `594d32439eb67af666bc69935ff161ababc58741` |
-| Deployment method | official genlayer-test Studio Mode |
+| Deployment source | `1dd86da00fff84344d3ff54e194c4b273ff013f1` |
+| Deployment method | official GenLayer CLI `0.39.2` |
 
-The deployable `contracts/ingress.py` on current `main` is unchanged from the deployed source commit. Subsequent commits affect only tests, tooling dependencies, fixtures and documentation; the deployable contract source remains identical. Full transaction evidence is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+This address is a fresh deployment of the contract **including** the validator excerpt-availability binding. Source parity was verified against the chain rather than asserted: `genlayer code` returns a source byte-for-byte identical to `contracts/ingress.py` at this commit. Full transaction evidence is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
-Live smoke verification against this address includes safe open `0x6904fced0e3e692192a65413dd417bed99acce7ac65c6b1dd2c3160447cac224`, safe resolve `0x47703a64c766f1955452b8863cd0988982e04008c310df939737e8459ee095ea` (`SAFE`, risk `0`, consumable `true`), cancellation `0x56e7e14c9826dd5c4c386a528cbd7d8afdfc6bf40e25bceb1a5990d8a24f6052` (`CANCELLED`), and hostile resolve `0x1b0c6f3d6f4cf6d5385f5407d622a5c16d2b9dda5fffeef9fbb762ea4d9d450a` (`QUARANTINED`, risk `265`, consumable `false`).
+The earlier address `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5` (source commit `594d3243`) predates this fix. It is retained in history for audit only and is **not** current evidence.
+
+Live smoke verification against the new address includes safe open `0xda1c8e5a5d71e7aa3e20651f7e8661c435cea0137311bd00333ef013297d4535`, safe resolve `0xe14bc74309ca33ef4ee4a9d818a62aeb47337c6469c6ce90ee20292ac283463c` (`SAFE`, risk `0`, grounded excerpt, consumable `true`), a second finalized safe resolve `0x3cbf2a3be553f54eb63eb708c47474adea975207f938066c94b2616847e27174`, cancellation `0xe0eef17a801d7ab47e24a27a73e94e1e375f7ce4a000a334f2c3f64076ef94c9` (`CANCELLED`), and hostile resolve `0x51f620aed7343bcd54d0c7a8561ceaeb82e4a58f07d462e9caa8511a17adb537` (`QUARANTINED`, risk `265`, `excerpts: []`, consumable `false`).
+
+Both safe resolutions reached `MAJORITY_AGREE` *with* a grounded excerpt, so validators independently confirmed that releasable evidence existed. Under the previous contract that same page could have settled as a non-consumable `SAFE` capsule on an unverified leader choice.
 
 ## 30-second reviewer version
 
@@ -629,7 +633,7 @@ If you have five minutes:
 **Primitive:** Ingress  
 **Purpose:** consensus-backed hostile-web-evidence intake  
 **Repository:** `https://github.com/ometere123/ingress`  
-**Studionet contract:** `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5`
+**Studionet contract:** `0xdd641B5bdBE8D9C14783b458425da180946Fe41c`
 
 Copy-ready submission notes are in [`SUBMISSION.md`](SUBMISSION.md).
 

@@ -13,14 +13,16 @@ Ingress is a reusable consensus firewall that screens untrusted live web content
 ## Repository and live evidence
 
 - Repository: `https://github.com/ometere123/ingress`
-- Studionet contract: `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5`
-- Deployment transaction: `0x277e11d40d3247b423017b12d47be884ccf5630a4bd6eb45942a184969f1dc72`
+- Studionet contract: `0xdd641B5bdBE8D9C14783b458425da180946Fe41c`
+- Deployment transaction: `0x4e3dda328e0bfc325e45497944fd9c71b7ed898bc92571eba4bf0d12283b3b70`
 - Deployment state: `FINALIZED`, `MAJORITY_AGREE`
-- Deployment source commit: `594d32439eb67af666bc69935ff161ababc58741`
-- Deployment method: official genlayer-test Studio Mode
+- Deployment source commit: `1dd86da00fff84344d3ff54e194c4b273ff013f1`
+- Deployment method: official GenLayer CLI `0.39.2`
 - Full deployment/smoke evidence: `docs/DEPLOYMENT.md`
 
-`contracts/ingress.py` has not changed since the deployment source commit. Subsequent commits affect only tests, tooling dependencies, fixtures and documentation; the deployable contract source remains identical.
+This is a **new address**, redeployed from the fixed source. Source parity is verified against the chain rather than asserted: `genlayer code 0xdd641B5bdBE8D9C14783b458425da180946Fe41c` returns a source byte-for-byte identical to `contracts/ingress.py` at this commit, including `judge_excerpt_release` and `excerpts_for_class`.
+
+The first submission's address `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5` (source commit `594d3243`) predates the excerpt-availability binding. Its bytecode is superseded and it should not be reviewed as current evidence.
 
 ## What changed after the first review
 
@@ -160,8 +162,8 @@ The model reports observations. Deterministic contract code decides what those o
 | Studionet integration | **PASS, 4 passed / 0 failed / 0 skipped** |
 | GenLayer CLI | **PASS**, `0.39.2` |
 | Studionet deployment | **PASS**, finalized |
-| Safe live source | **PASS**, resolve `0x47703a64c766f1955452b8863cd0988982e04008c310df939737e8459ee095ea`, `SAFE`, risk `0`, grounded excerpt, consumable `true` |
-| Hostile live fixture | **PASS**, resolve `0x1b0c6f3d6f4cf6d5385f5407d622a5c16d2b9dda5fffeef9fbb762ea4d9d450a`, `QUARANTINED`, risk `265`, consumable `false` |
+| Safe live source | **PASS**, resolve `0xe14bc74309ca33ef4ee4a9d818a62aeb47337c6469c6ce90ee20292ac283463c`, `SAFE`, risk `0`, grounded excerpt, consumable `true` |
+| Hostile live fixture | **PASS**, resolve `0x51f620aed7343bcd54d0c7a8561ceaeb82e4a58f07d462e9caa8511a17adb537`, `QUARANTINED`, risk `265`, `excerpts: []`, consumable `false` |
 | GenVM linter | **PASS**, published `genvm-linter==0.11.0`, `check --json` exit `0` |
 
 The Direct Mode Windows harness required an external, uncommitted temporary-file cleanup shim. No contract change was required to obtain the 26/26 result.
@@ -174,15 +176,17 @@ The committed Studionet integration suite independently redeploys Ingress throug
 
 The safe Studionet resolution transaction:
 
-`0x47703a64c766f1955452b8863cd0988982e04008c310df939737e8459ee095ea`
+`0xe14bc74309ca33ef4ee4a9d818a62aeb47337c6469c6ce90ee20292ac283463c`
 
-resolved capsule `1` to `SAFE`, risk mask `0`, with a grounded excerpt. `is_consumable(1)` returned `true`.
+resolved capsule `4` to `SAFE`, risk mask `0`, with a grounded excerpt. `is_consumable(4)` returned `true`. A second finalized safe resolution `0x3cbf2a3be553f54eb63eb708c47474adea975207f938066c94b2616847e27174` did the same for capsule `1`.
+
+These are the load-bearing new evidence. Both reached `MAJORITY_AGREE` **with** a grounded excerpt, so five validators independently rendered the source, independently judged the excerpt releasable, and independently agreed releasable evidence existed. Under the rejected contract that same page could have settled as a `SAFE` but non-consumable capsule with no validator ever examining the choice.
 
 The hostile Studionet resolution transaction:
 
-`0x1b0c6f3d6f4cf6d5385f5407d622a5c16d2b9dda5fffeef9fbb762ea4d9d450a`
+`0x51f620aed7343bcd54d0c7a8561ceaeb82e4a58f07d462e9caa8511a17adb537`
 
-resolved capsule `3` to `QUARANTINED`, risk mask `265` (`PROMPT_OVERRIDE`, `SECRET_EXFILTRATION`, `LITERAL_CONTROL_PHRASE`). `is_consumable(3)` returned `false`.
+resolved capsule `3` to `QUARANTINED`, risk mask `265` (`PROMPT_OVERRIDE`, `SECRET_EXFILTRATION`, `LITERAL_CONTROL_PHRASE`). `is_consumable(3)` returned `false`, and the stored capsule carried `excerpts: []`, confirming the class-bound evidence rule live on chain.
 
 The hostile input is the public repository fixture `fixtures/hostile_evidence.txt`.
 

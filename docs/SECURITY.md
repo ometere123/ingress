@@ -60,11 +60,14 @@ Consumers should not base settlement on one exact semantic risk bit; those categ
 | classifier risk type is fractional/hex-like/unsupported | `QUARANTINED` + `UNPARSABLE_ANALYSIS` |
 | semantic machine-control risk found | `QUARANTINED` |
 | deterministic literal floor only | `SUSPICIOUS` |
+| capsule is not SAFE | no excerpts released at all |
 | no grounded excerpt | not consumable |
 | validator security dimensions disagree | validator rejects proposal |
 | forged leader field has wrong type/unknown bits | validator rejects proposal |
 | excerpt is absent from validator snapshot | validator rejects proposal |
 | excerpt is active or irrelevant | validator rejects proposal |
+| excerpt attached to a non-SAFE observation | validator rejects proposal |
+| leader withheld evidence the validator found releasable | validator rejects proposal |
 
 ## URL admission and SSRF defence in depth
 
@@ -119,7 +122,7 @@ The custom validator separately validates leader fields because the leader propo
 
 The leader may propose at most a small bounded set of short excerpts.
 
-Leader-side canonicalisation keeps only string excerpts that occur in the leader's rendered source.
+Leader-side canonicalisation keeps only string excerpts that occur in the leader's rendered source, and drops evidence entirely when the leader's own classification is not SAFE.
 
 Every validator then independently renders and classifies its own source snapshot. The **same snapshot** is used to verify that each leader excerpt:
 
@@ -131,6 +134,18 @@ Every validator then independently renders and classifies its own source snapsho
 
 Using one validator snapshot for classification and anchoring avoids a second-fetch time-of-check/time-of-use window.
 
+## Evidence suppression
+
+Anchoring alone only constrains what a leader releases. It says nothing about what a leader silently withholds.
+
+Because `is_consumable` is `SAFE` plus a non-empty excerpt list, an unchecked empty list would let a leader decide consumability by itself: the same SAFE page could settle as usable evidence or as an inert capsule depending only on which leader proposed it, with no validator ever examining that choice.
+
+Validators therefore bind availability to their own observation. When a leader releases nothing, each validator runs its own grounded candidates through the **same** release judgment used to gate released excerpts, and rejects the proposal if any candidate would have passed.
+
+Because both directions share one acceptance test, the rule is symmetric: a capsule is non-consumable only when validators independently observed nothing releasable. A candidate the judge refuses is not available evidence, so an honest leader is never penalised for declining to release something unreleasable.
+
+Two limitations are worth stating plainly. This binds *availability*, not *selection*: among several releasable excerpts, which subset a leader picks is still its own choice, and every pick is independently grounded and judged. And on genuinely borderline pages honest models can disagree about availability, in which case the proposal is rejected and the capsule stays `PENDING` rather than settling unverified.
+
 ## Consensus equivalence and semantic labels
 
 Validators are not required to choose the identical fine-grained semantic category for the same hard attack. Two honest models may label the same text differently while agreeing it is unsafe.
@@ -141,9 +156,10 @@ They must agree on:
 - whether any semantic hard risk exists;
 - deterministic literal-floor presence;
 - analysis-failure presence;
-- terminal security class.
+- terminal security class;
+- whether releasable evidence existed at all.
 
-A leader cannot therefore propose a consumable `SAFE` result when a validator independently observes any hard-risk dimension.
+A leader cannot therefore propose a consumable `SAFE` result when a validator independently observes any hard-risk dimension, and cannot propose a non-consumable `SAFE` result when a validator independently observes releasable evidence.
 
 ## What SAFE means
 

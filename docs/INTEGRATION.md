@@ -14,6 +14,8 @@ Ingress is designed to sit before any contract logic that would otherwise place 
 
 Do not treat `status == SAFE` alone as a complete evidence gate. A SAFE source with no purpose-relevant, source-anchored excerpt is intentionally not consumable.
 
+That empty-evidence outcome is itself validator-decided, not a leader's discretion: a `SAFE` capsule reaches settlement with no excerpts only when validators independently observed nothing releasable in their own source snapshots. Integrators can therefore read `is_consumable == false` on a `SAFE` capsule as a consensus statement about the source, not as a possible artefact of which leader happened to serve the transaction. See [`CONSENSUS.md`](CONSENSUS.md) for the binding.
+
 ## Cross-contract interface
 
 The deployable contract exports `IIngress`:

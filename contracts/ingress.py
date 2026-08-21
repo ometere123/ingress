@@ -329,6 +329,18 @@ def risk_class(mask: int) -> int:
     return STATUS_SAFE
 
 
+def excerpts_for_class(excerpts: list[str], mask: int) -> list[str]:
+    """Evidence may only ride on a SAFE capsule.
+
+    Keeping this deterministic and shared by the leader path, the validator and
+    settlement makes the excerpt field total: a capsule carries evidence if and
+    only if its derived class is SAFE. Nothing about that is a leader choice.
+    """
+    if risk_class(mask) != STATUS_SAFE:
+        return []
+    return excerpts
+
+
 def risk_names(mask: int) -> list[str]:
     table = (
         (RISK_PROMPT_OVERRIDE, "PROMPT_OVERRIDE"),
@@ -415,6 +427,22 @@ or is unrelated to the purpose.
 # ---------------------------------------------------------------------------
 
 
+def judge_excerpt_release(excerpt: str, purpose: str) -> bool:
+    """One independent release judgment for a candidate excerpt.
+
+    This is the single acceptance test for evidence release. Validators apply it
+    both to excerpts the leader proposed and to candidates the leader withheld,
+    so releasing and withholding are judged by identical criteria.
+    """
+    verdict = str(
+        gl.nondet.exec_prompt(
+            validator_excerpt_prompt(excerpt, purpose),
+            response_format="text",
+        )
+    ).strip().upper()
+    return verdict == "PASS"
+
+
 def inspect_once(url: str, purpose: str, include_source: bool = False) -> dict:
     """Fetch and classify one independent source observation."""
     try:
@@ -462,7 +490,10 @@ def inspect_once(url: str, purpose: str, include_source: bool = False) -> dict:
         "reachable": True,
         "risk_mask": mask,
         "reason": reason,
-        "excerpts": excerpts,
+        # An honest observer never proposes evidence from a source its own
+        # classification already condemned, so a non-SAFE observation carries
+        # no excerpts for a validator to have to argue about.
+        "excerpts": excerpts_for_class(excerpts, mask),
     }
     if include_source:
         result["source_text"] = source
@@ -547,6 +578,13 @@ class Ingress(gl.Contract):
             excerpts = leader.get("excerpts", [])
             if not isinstance(excerpts, list) or len(excerpts) > MAX_EXCERPTS:
                 return False
+
+            # Evidence may only ride on a SAFE capsule. A leader that attaches
+            # excerpts to a risky observation is rejected outright rather than
+            # having them silently dropped at settlement.
+            if risk_class(own_mask) != STATUS_SAFE:
+                return len(excerpts) == 0
+
             for raw_excerpt in excerpts:
                 if not isinstance(raw_excerpt, str) or len(raw_excerpt) > MAX_EXCERPT_LEN:
                     return False
@@ -554,16 +592,35 @@ class Ingress(gl.Contract):
                 if excerpt == "" or excerpt != raw_excerpt or excerpt not in normalized_page:
                     return False
                 try:
-                    verdict = str(
-                        gl.nondet.exec_prompt(
-                            validator_excerpt_prompt(excerpt, purpose),
-                            response_format="text",
-                        )
-                    ).strip().upper()
+                    if not judge_excerpt_release(excerpt, purpose):
+                        return False
                 except Exception:
                     return False
-                if verdict != "PASS":
+
+            # Consumability must follow from the validator's own observation,
+            # never from an unverified leader choice to stay silent. A SAFE
+            # leader releasing nothing is accepted only when this validator
+            # independently finds nothing releasable in its own snapshot
+            # either. Otherwise the same SAFE inspection could be consumable or
+            # not depending on which leader happened to propose it.
+            if len(excerpts) == 0:
+                own_excerpts = own.get("excerpts", [])
+                if not isinstance(own_excerpts, list):
                     return False
+                for candidate in own_excerpts[:MAX_EXCERPTS]:
+                    if not isinstance(candidate, str):
+                        continue
+                    value = clean_text(candidate, MAX_EXCERPT_LEN)
+                    if value == "" or value not in normalized_page:
+                        continue
+                    try:
+                        releasable = judge_excerpt_release(value, purpose)
+                    except Exception:
+                        return False
+                    if releasable:
+                        # A grounded, passive, relevant excerpt was available
+                        # and the leader withheld it. Reject the proposal.
+                        return False
 
             return True
 
@@ -640,9 +697,12 @@ class Ingress(gl.Contract):
         excerpts = result.get("excerpts", [])
         if not isinstance(excerpts, list):
             excerpts = []
+        excerpts = excerpts_for_class(excerpts, mask)
 
-        # A SAFE capsule with no grounded evidence is harmless but useless. It
-        # remains SAFE as a source-security result; is_consumable stays false.
+        # Evidence release is now fully validator-bound: a SAFE capsule reaches
+        # settlement with an empty excerpt list only when validators agreed that
+        # their own snapshot held nothing releasable, so is_consumable reflects
+        # validator observation rather than leader discretion.
         capsule.status = u8(status)
         capsule.risk_mask = u32(mask)
         capsule.reason = clean_text(result.get("reason", ""), MAX_REASON_LEN)

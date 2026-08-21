@@ -4,8 +4,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/GenLayer-Intelligent%20Contract-111111" alt="GenLayer Intelligent Contract" />
-  <img src="https://img.shields.io/badge/Direct%20Mode-19%2F19%20passing-111111" alt="19 of 19 Direct Mode tests passing" />
-  <img src="https://img.shields.io/badge/preflight-74%2F74%20passing-111111" alt="74 of 74 preflight checks passing" />
+  <img src="https://img.shields.io/badge/Direct%20Mode-26%2F26%20passing-111111" alt="26 of 26 Direct Mode tests passing" />
+  <img src="https://img.shields.io/badge/preflight-86%2F86%20passing-111111" alt="86 of 86 preflight checks passing" />
   <img src="https://img.shields.io/badge/Studionet-FINALIZED-111111" alt="Studionet deployment finalized" />
   <img src="https://img.shields.io/badge/license-MIT-111111" alt="MIT license" />
 </p>
@@ -26,7 +26,7 @@ resolve(capsule_id)
         +--> UNAVAILABLE   source could not be read
 ```
 
-Only a `SAFE` capsule with at least one validator-grounded excerpt returns `is_consumable(capsule_id) == true`.
+Only a `SAFE` capsule with at least one validator-grounded excerpt returns `is_consumable(capsule_id) == true`. Whether that excerpt list is empty is itself decided by validators, not by the leader — see [evidence availability](#evidence-availability-is-validator-bound).
 
 ## Live Studionet deployment
 
@@ -47,7 +47,7 @@ Live smoke verification against this address includes safe open `0x6904fced0e3e6
 
 Ingress solves one narrow reusable problem: **how can a downstream Intelligent Contract consume live web evidence without blindly letting the page itself instruct or redirect the model reading it?**
 
-The caller provides a URL and a bounded passive evidence purpose. The leader fetches and classifies the live source. Validators independently fetch and classify it again, reject malformed or forged leader fields, ground every proposed excerpt in their own observed source snapshot, and independently judge whether each released excerpt is passive and relevant. Deterministic contract code then derives the terminal status.
+The caller provides a URL and a bounded passive evidence purpose. The leader fetches and classifies the live source. Validators independently fetch and classify it again, reject malformed or forged leader fields, ground every proposed excerpt in their own observed source snapshot, independently judge whether each released excerpt is passive and relevant, and independently decide whether any evidence was releasable at all. Deterministic contract code then derives the terminal status.
 
 The model never directly writes `SAFE`, `SUSPICIOUS`, or `QUARANTINED`.
 
@@ -107,11 +107,11 @@ The load-bearing GenLayer property is that validators independently observe and 
 | Standalone reusable contract | One deployable `contracts/ingress.py`; no application layer |
 | Real GenLayer consensus | Custom `gl.vm.run_nondet_unsafe` leader/validator flow |
 | Clear state design | `PENDING` to immutable terminal evidence-security capsules |
-| Thoughtful validator/equivalence logic | Independent re-fetch, re-classification, typed forged-leader checks, security-dimension equivalence and excerpt verification |
+| Thoughtful validator/equivalence logic | Independent re-fetch, re-classification, typed forged-leader checks, security-dimension equivalence, excerpt verification and validator-bound evidence availability |
 | Meaningful beyond a demo | Reusable intake gate for prediction, insurance, governance, policy, agent and corroboration contracts |
 | Readable source | Bounded helpers, fixed risk taxonomy and deterministic terminal derivation |
 | Documentation | Consensus, security, integration and real deployment evidence docs |
-| Tests | 74/74 source preflight checks, 19/19 Direct Mode tests, pickling enabled, 4/4 Studionet integration tests and live smoke evidence |
+| Tests | 86/86 source preflight checks, 26/26 Direct Mode tests, pickling enabled, 4/4 Studionet integration tests and live smoke evidence |
 | Not a Project submission | No frontend, dashboard, wallet UX, backend or settlement-specific workflow |
 
 ## Contract boundary
@@ -264,7 +264,8 @@ The leader:
 4. sends JSON-framed purpose and hostile source data to the classifier;
 5. requests structured JSON classification output;
 6. keeps only short string excerpts that occur verbatim in the observed source;
-7. proposes reachability, risk findings, reason, and excerpts.
+7. drops evidence entirely when its own classification is not SAFE;
+8. proposes reachability, risk findings, reason, and excerpts.
 
 The hostile page is encoded as data rather than interpolated as an instruction section.
 
@@ -278,18 +279,37 @@ Each validator independently:
 4. rejects unknown risk bits or malformed leader fields;
 5. checks security-relevant risk dimensions and the derived class independently agree;
 6. uses the **same validator snapshot** for classification and excerpt grounding, avoiding a second-fetch time-of-check/time-of-use gap;
-7. requires every leader excerpt to be a canonical bounded string present in that validator snapshot;
-8. independently judges every released excerpt as passive and relevant to the caller purpose.
+7. rejects any excerpt attached to a non-SAFE derivation;
+8. requires every leader excerpt to be a canonical bounded string present in that validator snapshot;
+9. independently judges every released excerpt as passive and relevant to the caller purpose;
+10. when the leader released nothing, judges its **own** grounded candidates by that same test and rejects the proposal if any of them was releasable.
 
 A validator is therefore not a JSON/schema checker. The Direct Mode suite explicitly injects forged leader payloads using `direct_vm.run_validator(leader_result=...)`.
 
 See [`docs/CONSENSUS.md`](docs/CONSENSUS.md).
 
+## Evidence availability is validator-bound
+
+`is_consumable` is `SAFE` plus a non-empty excerpt list. Verifying only the excerpts a leader chose to release would leave the empty list as the one consensus-visible field nobody checked, so two honest leaders could turn the identical SAFE page into a consumable or a non-consumable capsule purely by choosing whether to speak.
+
+Ingress closes that by making both directions share one acceptance test, `judge_excerpt_release`:
+
+| Leader proposed | Validator requirement |
+|---|---|
+| one or more excerpts | each is grounded in the validator's own snapshot and passes the validator's own release judgment |
+| nothing | no grounded candidate in the validator's own snapshot passes that same release judgment |
+
+> A capsule is non-consumable only when validators independently observed nothing releasable.
+
+Evidence also rides on `SAFE` only. `excerpts_for_class` is shared by the leader path, the validator and settlement, so a capsule carries evidence if and only if its derived class is `SAFE`.
+
+This binds availability, not selection: which releasable subset a leader picks remains its own choice, and every pick is independently grounded and judged. On genuinely borderline pages honest models can disagree about availability, in which case the proposal is rejected and the capsule stays `PENDING` rather than settling unverified.
+
 ## Equivalence rule
 
 Validators do **not** require identical prose or identical fine-grained semantic category bits. Those can legitimately vary between independent model executions.
 
-They do require agreement on the security facts that affect downstream behavior: reachability, hard-risk presence, literal-floor presence, parser-failure presence and the derived terminal class. A well-formed leader result that says SAFE while the validator independently observes a hard-risk source is rejected.
+They do require agreement on the security facts that affect downstream behavior: reachability, hard-risk presence, literal-floor presence, parser-failure presence, the derived terminal class and whether releasable evidence existed at all. A well-formed leader result that says SAFE while the validator independently observes a hard-risk source is rejected, and so is a well-formed SAFE result that withholds evidence the validator independently found releasable.
 
 This is why strict byte/prose equality would be too brittle, while format-only validation would be too weak.
 
@@ -340,7 +360,9 @@ This is defence in depth, not a claim that contract code can replace validator-n
 - forged unknown bits are rejected;
 - truthy strings cannot impersonate booleans;
 - every released excerpt must be a canonical string anchored in the independent validator snapshot;
-- every excerpt receives an independent passive/relevance judgment.
+- every excerpt receives an independent passive/relevance judgment;
+- excerpts attached to a non-SAFE derivation are rejected;
+- an empty excerpt list is rejected when the validator's own snapshot held releasable evidence.
 
 ### After consensus
 
@@ -350,7 +372,7 @@ Only this path is automatically consumable:
 status == SAFE and len(excerpts) > 0
 ```
 
-A safe classification with no grounded evidence is harmless but is not consumable evidence.
+A safe classification with no grounded evidence is harmless but is not consumable evidence — and it can only reach that state when validators independently agreed nothing was releasable.
 
 ## Fail-closed matrix
 
@@ -360,9 +382,11 @@ A safe classification with no grounded evidence is harmless but is not consumabl
 | Semantic machine-control risk | `QUARANTINED` |
 | Classifier cannot be safely parsed | `QUARANTINED` |
 | Deterministic literal floor only | at least `SUSPICIOUS` |
+| Capsule is not SAFE | no excerpts released at all |
 | SAFE classification but no grounded excerpt | `is_consumable == false` |
 | Forged/wrongly typed leader fields | validator rejects proposal |
 | Leader/validator security-class disagreement | validator rejects proposal |
+| Leader withheld evidence the validator found releasable | validator rejects proposal |
 | Terminal capsule resolved again | rejected |
 | Non-requester cancellation | rejected |
 
@@ -402,9 +426,9 @@ Returns the fixed diagnostic risk dictionary.
 
 | Gate | Result | Evidence |
 |---|---|---|
-| SDK-free source preflight | PASS | `74/74` checks |
+| SDK-free source preflight | PASS | `86/86` checks |
 | Python source compilation | PASS | contract and deployment/preflight scripts compile |
-| Direct Mode | PASS | `19 passed, 0 failed, 0 skipped` with `genlayer-test v0.29.2`, Python 3.12.13, strict mocks and pickling enabled |
+| Direct Mode | PASS | `26 passed, 0 failed, 0 skipped` with `genlayer-test v0.29.2`, Python 3.12.13, strict mocks and pickling enabled |
 | Pickling | PASS | `direct_vm.check_pickling = True` |
 | GenVM linter | PASS | `genvm-lint check contracts/ingress.py --json`, genvm-linter `0.11.0`, exit `0` |
 | Studionet integration | PASS | `4 passed` via `pytest tests/integration/ -v -s --network studionet` |
@@ -423,7 +447,7 @@ The primary GenVM linter gate is green. Its JSON check reported `lint.ok=true` a
 python scripts/preflight.py
 ```
 
-The script reads the actual `contracts/ingress.py` source and checks structure, nondeterminism placement, absence of state writes/events inside `_inspect`, URL hardening, risk parsing, evidence anchoring, status derivation, hostile-input prompt framing and timestamp compatibility.
+The script reads the actual `contracts/ingress.py` source and checks structure, nondeterminism placement, absence of state writes/events inside `_inspect`, URL hardening, risk parsing, evidence anchoring, class-bound evidence release, the validator's own excerpt-availability binding, status derivation, hostile-input prompt framing and timestamp compatibility.
 
 ### Direct Mode
 
@@ -433,6 +457,8 @@ pytest tests/direct/ -v -s
 ```
 
 The suite covers normal state transitions and adversarial cases including safe grounded evidence, prompt-like purpose rejection, literal and semantic attacks, malformed/fractional/hex-like risk fields, unsupported bits, invented excerpts, forged leader payloads, non-boolean reachability, security-class disagreement, cancellation and single-resolution rules.
+
+It also covers the excerpt-availability binding in both directions: a leader that withholds evidence the validator independently finds releasable is rejected, an honest empty result is still accepted when the validator observes nothing releasable or when its own candidate fails the release judgment, and evidence attached to a non-`SAFE` observation is rejected by both the validator and settlement.
 
 ### GenVM linter
 

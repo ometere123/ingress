@@ -43,7 +43,33 @@ Parity was verified directly against the chain rather than asserted:
 genlayer code 0xdd641B5bdBE8D9C14783b458425da180946Fe41c --rpc https://studio.genlayer.com/api
 ```
 
-The returned source is byte-for-byte identical to `contracts/ingress.py` at this commit (`sha256:a53fba4d8d6d2615e0a6d2e59d0a0863c6ca36dd55141195a958f3baaf91acbc`). The chain copy contains `judge_excerpt_release` and `excerpts_for_class` at the same occurrence counts as the local file, including the `risk_class(own_mask) != STATUS_SAFE` guard in `validator_fn`.
+The returned source is identical to `contracts/ingress.py` at this commit. The chain copy contains `judge_excerpt_release` and `excerpts_for_class` at the same occurrence counts as the local file, including the `risk_class(own_mask) != STATUS_SAFE` guard in `validator_fn`.
+
+### Line endings — read this before diffing
+
+The two copies are identical in content but differ in newline encoding, so a naive `diff` reports every line as changed. This is an artifact of the upload environment, not a source difference:
+
+| Copy | Newlines | Bytes | `sha256` |
+|---|---|---|---|
+| On chain, via `genlayer code` | CRLF | 29006 | `d6163e0992a9f482aa3d51d31c6b62b511ba14697f051d6b704fb3102c2c3c36` |
+| Git blob / `raw.githubusercontent.com` | LF | 28234 | `a53fba4d8d6d2615e0a6d2e59d0a0863c6ca36dd55141195a958f3baaf91acbc` |
+| Either copy, after LF normalization | LF | 28234 | `a53fba4d8d6d2615e0a6d2e59d0a0863c6ca36dd55141195a958f3baaf91acbc` |
+
+The deploy was uploaded from a Windows working tree, where `core.autocrlf` had converted the committed LF blob to CRLF on checkout. Git stores and serves the LF form; the chain therefore holds the CRLF form of the same file.
+
+To verify parity in one step, normalize newlines before comparing:
+
+```bash
+genlayer code 0xdd641B5bdBE8D9C14783b458425da180946Fe41c --rpc https://studio.genlayer.com/api > chain.txt
+curl -s https://raw.githubusercontent.com/ometere123/ingress/main/contracts/ingress.py > repo.py
+python -c "
+chain = open('chain.txt','rb').read().replace(b'\r\n', b'\n')
+repo  = open('repo.py','rb').read()
+print('PARITY OK' if repo in chain else 'MISMATCH')
+"
+```
+
+This prints `PARITY OK`. The substring test absorbs the `Result:` banner and trailing blank line the CLI adds around the source, and the `replace` absorbs the carriage returns. We state this explicitly rather than claim a byte-identity that a reviewer's own `diff` would contradict.
 
 The committed `tests/integration/test_ingress_studionet.py` suite independently redeploys this same contract through official Studio Mode for reproducibility; those disposable test deployments do not replace the canonical address recorded above.
 
@@ -52,7 +78,7 @@ The committed `tests/integration/test_ingress_studionet.py` suite independently 
 | Action | Transaction | Result |
 |---|---|---|
 | Schema | — | PASS; all six Ingress methods present — `open_inspection`, `resolve`, `cancel`, `get_capsule`, `is_consumable`, `get_risk_dictionary` |
-| Deployed code | — | PASS; CLI returned deployed source byte-identical to the deployment source commit |
+| Deployed code | — | PASS; CLI returned deployed source identical to the deployment source commit (newline encoding aside — see *Line endings* above) |
 | Open safe inspection | `0xda1c8e5a5d71e7aa3e20651f7e8661c435cea0137311bd00333ef013297d4535` | PASS; capsule `4`, `PENDING` |
 | Safe resolve | `0xe14bc74309ca33ef4ee4a9d818a62aeb47337c6469c6ce90ee20292ac283463c` | PASS; capsule `4`, `SAFE`, risk mask `0`, grounded excerpt returned, `MAJORITY_AGREE` |
 | Safe `is_consumable(4)` | — | `true` |

@@ -41,7 +41,7 @@ We deliberately reused the strict release judgment rather than a looser "was any
 
 **Verifiable now, independently of our claims:**
 
-- Redeployed at `0xdd641B5bdBE8D9C14783b458425da180946Fe41c`, tx `0x4e3dda32…`, `FINALIZED` / `MAJORITY_AGREE`. `genlayer code` returns a source byte-for-byte identical to `contracts/ingress.py` — parity verified against the chain, not asserted.
+- Redeployed at `0xdd641B5bdBE8D9C14783b458425da180946Fe41c`, tx `0x4e3dda32…`, `FINALIZED` / `MAJORITY_AGREE`. `genlayer code` returns a source identical to `contracts/ingress.py` — parity verified against the chain, not asserted. The chain copy carries CRLF from a Windows upload while git serves LF; after normalization both are the same 28,234 bytes (`sha256:a53fba4d…`). `docs/DEPLOYMENT.md` has both digests and a tested one-step check.
 - `test_validator_rejects_leader_that_withholds_available_evidence` fails against the rejected contract and passes against the corrected one.
 - Preflight 86/86, Direct Mode 26/26, Studionet integration 4/4, `genvm-linter` exit 0.
 - The prior address `0x86506D40…` is retained in the docs as an explicit superseded-evidence note, not presented as current.

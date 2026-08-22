@@ -20,7 +20,9 @@ Ingress is a reusable consensus firewall that screens untrusted live web content
 - Deployment method: official GenLayer CLI `0.39.2`
 - Full deployment/smoke evidence: `docs/DEPLOYMENT.md`
 
-This is a **new address**, redeployed from the fixed source. Source parity is verified against the chain rather than asserted: `genlayer code 0xdd641B5bdBE8D9C14783b458425da180946Fe41c` returns a source byte-for-byte identical to `contracts/ingress.py` at this commit, including `judge_excerpt_release` and `excerpts_for_class`.
+This is a **new address**, redeployed from the fixed source. Source parity is verified against the chain rather than asserted: `genlayer code 0xdd641B5bdBE8D9C14783b458425da180946Fe41c` returns a source identical to `contracts/ingress.py` at this commit, including `judge_excerpt_release` and `excerpts_for_class`.
+
+The two copies differ in newline encoding only — the chain holds CRLF (`sha256:d6163e09…`) because the deploy was uploaded from a Windows working tree, while the git blob and `raw.githubusercontent.com` serve LF (`sha256:a53fba4d…`). After LF normalization both are the identical 28,234 bytes. A naive `diff` will therefore report every line as changed; [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) gives a tested one-step check that prints `PARITY OK`.
 
 The first submission's address `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5` (source commit `594d3243`) predates the excerpt-availability binding. Its bytecode is superseded and it should not be reviewed as current evidence.
 

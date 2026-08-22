@@ -39,7 +39,7 @@ Only a `SAFE` capsule with at least one validator-grounded excerpt returns `is_c
 | Deployment source | `1dd86da00fff84344d3ff54e194c4b273ff013f1` |
 | Deployment method | official GenLayer CLI `0.39.2` |
 
-This address is a fresh deployment of the contract **including** the validator excerpt-availability binding. Source parity was verified against the chain rather than asserted: `genlayer code` returns a source byte-for-byte identical to `contracts/ingress.py` at this commit. Full transaction evidence is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+This address is a fresh deployment of the contract **including** the validator excerpt-availability binding. Source parity was verified against the chain rather than asserted: `genlayer code` returns a source identical to `contracts/ingress.py` at this commit, differing only in newline encoding (the chain holds CRLF from a Windows upload; git serves LF). [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) has the digests for both forms and a tested one-step parity check, plus full transaction evidence.
 
 The earlier address `0x86506D4017B5B47Ce8Cd03b3C561E3bd96cfA0e5` (source commit `594d3243`) predates this fix. It is retained in history for audit only and is **not** current evidence.
 
